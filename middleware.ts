@@ -1,40 +1,54 @@
 // middleware.ts
-import { auth } from "@/auth"
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { auth } from "@/auth"; // Sesuaikan path ini dengan lokasi file auth.ts Anda
 
 export default auth((req) => {
+  const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  const userRole = (req.auth?.user as any)?.role;
-  const isOnAdmin = req.nextUrl.pathname.startsWith('/admin');
-  const isOnDashboard = req.nextUrl.pathname.startsWith('/dashboard');
-  const isOnLogin = req.nextUrl.pathname.startsWith('/login');
+  const userRole = req.auth?.user?.role; // Pastikan auth.ts mengembalikan role
 
-  // 1. Jika sudah login tapi buka halaman login, lempar ke dashboard
-  if (isLoggedIn && isOnLogin) {
-    if (userRole === 'DEVELOPER' || userRole === 'ADMIN') {
-        return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+  // 1. Definisikan Route
+  const isAdminRoute = nextUrl.pathname.startsWith("/admin");
+  const isClientRoute = nextUrl.pathname.startsWith("/dashboard");
+  const isAuthRoute = nextUrl.pathname.startsWith("/login");
+  const isPublicRoute = 
+    nextUrl.pathname.startsWith("/invitation") || 
+    nextUrl.pathname === "/";
+
+  // 2. Logic Redirect
+  
+  // Jika User sedang di halaman Login tapi sudah login -> lempar ke Dashboard
+  if (isAuthRoute && isLoggedIn) {
+    if (userRole === "ADMIN") {
+        return NextResponse.redirect(new URL("/admin", nextUrl));
     }
-    return NextResponse.redirect(new URL('/dashboard', req.url));
+    return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // 2. Proteksi Halaman Admin
-  if (isOnAdmin) {
-    if (!isLoggedIn) return NextResponse.redirect(new URL('/login', req.url));
-    if (userRole !== 'DEVELOPER' && userRole !== 'ADMIN') {
-        // Klien nakal coba masuk admin -> tendang ke dashboard biasa
-        return NextResponse.redirect(new URL('/dashboard', req.url));
+  // Jika User bukan Admin tapi coba akses /admin
+  if (isAdminRoute) {
+    if (!isLoggedIn) {
+        return NextResponse.redirect(new URL("/login", nextUrl));
+    }
+    if (userRole !== "ADMIN") {
+        // Jika Client iseng coba buka /admin, lempar balik ke dashboard
+        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
   }
 
-  // 3. Proteksi Halaman Dashboard Client
-  if (isOnDashboard && !isLoggedIn) {
-    return NextResponse.redirect(new URL('/login', req.url));
+  // Jika User belum login coba akses /dashboard
+  if (isClientRoute && !isLoggedIn) {
+    return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
   return NextResponse.next();
-})
+});
 
-// Matcher: Tentukan route mana yang kena efek middleware
+// Matcher: Tentukan route mana saja yang kena middleware
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
-}
+  matcher: [
+    // Skip file statis (_next, images, favicon)
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};

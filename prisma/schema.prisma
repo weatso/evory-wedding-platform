@@ -26,18 +26,18 @@ enum ThemeType {
   RUSTIC_A
   LUXURY_GOLD
   MINIMALIST_B
-  CUSTOM_CODE // Jika undangan ini codingan khusus/mahal
+  CUSTOM_CODE // Jika undangan ini codingan khusus
 }
 
 // --- 1. USER (Hanya Vendor & Client) ---
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String   // Wajib di-hash!
+  password  String   // Wajib di-hash (bcrypt)
   name      String
   role      Role     @default(CLIENT)
   
-  // Client bisa punya 1 atau lebih undangan (biasanya 1)
+  // Client bisa punya banyak undangan (biasanya 1)
   invitations Invitation[]
 
   createdAt DateTime @default(now())
@@ -51,7 +51,7 @@ model Invitation {
   
   // Konfigurasi Tampilan
   theme         ThemeType @default(RUSTIC_A)
-  isActive      Boolean   @default(true) // Jika belum lunas, bisa dimatikan
+  isActive      Boolean   @default(true) // Switch On/Off undangan
   
   // Data Mempelai (Diinput oleh Vendor)
   groomName     String
@@ -64,7 +64,7 @@ model Invitation {
   brideFather   String
   brideMother   String
   
-  // Data Acara (Bisa dibuat JSON jika acara ada banyak sesi)
+  // Data Acara 
   eventDate     DateTime
   location      String
   mapUrl        String?
@@ -88,7 +88,8 @@ model Guest {
   category      String?  // cth: VIP, Keluarga, Teman Kantor
   
   // TOKEN RAHASIA (Ini kuncinya!)
-  token         String   @unique @default(cuid()) // cth: clq2... (acak)
+  // Tamu masuk via: webnikah.com/romeo-juliet?u=TOKEN_INI
+  token         String   @unique @default(cuid()) 
   
   rsvpStatus    RsvpStatus @default(PENDING)
   pax           Int        @default(1) // Jumlah orang yang dibawa

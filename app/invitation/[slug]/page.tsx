@@ -1,7 +1,7 @@
 // app/invitation/[slug]/page.tsx
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { getTemplateComponent } from "@/components/templates/registry"; // Import helper tadi
+import { getTemplateComponent } from "./components/templates/registry";
 
 export default async function InvitationPage({ params, searchParams }: any) {
   const { slug } = await params;
@@ -25,7 +25,7 @@ export default async function InvitationPage({ params, searchParams }: any) {
 
   // 3. AMBIL COMPONENT SECARA DINAMIS
   // Database menyimpan string enum: "LUXURY_GOLD"
-  const TemplateComponent = getTemplateComponent(invitation.theme);
+  import { getTemplateComponent } from "./components/templates/registry";
 
   // 4. Render
   return (
