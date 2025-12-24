@@ -8,11 +8,17 @@ import { updateInvitation } from "../../actions";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 
-// Generator List Jam (07:00 - 21:00)
-const HOURS = Array.from({ length: 15 }, (_, i) => {
-    const h = i + 7; // Mulai jam 07:00
-    return `${h.toString().padStart(2, '0')}:00`;
-});
+// --- PERBAIKAN DI SINI (Tambahkan : string[]) ---
+const HOURS: string[] = []; // <-- Explicit Type Definition
+const startHour = 7;  
+const endHour = 21;   
+
+for (let h = startHour; h <= endHour; h++) {
+    const hourStr = h.toString().padStart(2, '0');
+    HOURS.push(`${hourStr}:00`);
+    HOURS.push(`${hourStr}:30`);
+}
+// ---------------------------------------------
 
 const TIMEZONES = ["WIB", "WITA", "WIT"];
 
@@ -22,13 +28,10 @@ export default function EditInvitationForm({ invitation }: { invitation: any }) 
     null
   );
 
-  // Parsing Data Lama
   const dateStr = invitation.eventDate 
     ? new Date(invitation.eventDate).toISOString().split('T')[0] 
     : '';
 
-  // Mencoba menebak jam lama dari string "08:00 WIB" agar dropdown terpilih otomatis
-  // Jika format lama tidak standar, default ke "08:00"
   const defaultTime = invitation.eventTime?.slice(0, 5) || "08:00"; 
   const defaultZone = invitation.eventTime?.slice(6, 9) || "WIB";
 
@@ -72,7 +75,7 @@ export default function EditInvitationForm({ invitation }: { invitation: any }) 
           </div>
       </div>
 
-      {/* --- BAGIAN TANGGAL & WAKTU (UPDATED UX) --- */}
+      {/* --- TANGGAL & WAKTU --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
         <div className="space-y-2">
             <Label>Tanggal Acara</Label>
@@ -82,7 +85,11 @@ export default function EditInvitationForm({ invitation }: { invitation: any }) 
         {/* DROPDOWN JAM */}
         <div className="space-y-2">
             <Label>Jam Mulai</Label>
-            <select name="selectedTime" defaultValue={defaultTime} className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <select 
+                name="selectedTime" 
+                defaultValue={defaultTime} 
+                className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
                 {HOURS.map(h => (
                     <option key={h} value={h}>{h}</option>
                 ))}
@@ -92,7 +99,11 @@ export default function EditInvitationForm({ invitation }: { invitation: any }) 
         {/* DROPDOWN ZONA */}
         <div className="space-y-2">
             <Label>Zona Waktu</Label>
-            <select name="selectedZone" defaultValue={defaultZone} className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <select 
+                name="selectedZone" 
+                defaultValue={defaultZone} 
+                className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
                 {TIMEZONES.map(z => (
                     <option key={z} value={z}>{z}</option>
                 ))}
