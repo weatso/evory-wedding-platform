@@ -11,33 +11,54 @@ import {
   CheckCircle, 
   XCircle, 
   Clock, 
-  LogOut 
+  LogOut,
+  LayoutDashboard 
 } from "lucide-react";
 import { deleteGuest } from "./actions";
 import GuestForm from "./GuestForm";
 import { signOut } from "@/auth";
-import { CopyButton } from "@/components/ui/copy-button"; // <-- IMPORT BARU
+import { CopyButton } from "@/components/ui/copy-button"; 
 
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage() {
+interface PageProps {
+  searchParams: Promise<{ viewAs?: string }>; // Menangkap param viewAs
+}
+
+export default async function DashboardPage(props: PageProps) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  const searchParams = await props.searchParams;
+  const viewAsId = searchParams.viewAs;
+
+  // --- LOGIKA GOD MODE (ADMIN VIEW) ---
+  // Defaultnya targetUserId adalah diri sendiri
+  let targetUserId = session.user.id;
+  let isAdminView = false;
+
+  // TAPI, jika user adalah ADMIN dan ada request 'viewAs', ganti targetnya
+  if (session.user.role === "ADMIN" && viewAsId) {
+    targetUserId = viewAsId;
+    isAdminView = true;
+  }
+
+  // Ambil Data Undangan berdasarkan targetUserId
   const invitation = await prisma.invitation.findFirst({
-    where: { userId: session.user.id },
+    where: { userId: targetUserId },
     include: { guests: { orderBy: { createdAt: 'desc' } } }
   });
 
+  // Jika Undangan tidak ditemukan
   if (!invitation) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
         <div className="bg-white p-8 rounded-xl shadow-sm text-center max-w-md border border-slate-200">
-          <h1 className="text-xl font-bold text-slate-800 mb-2">Undangan Belum Siap</h1>
-          <p className="text-slate-500 mb-6">Hubungi Admin untuk mengaktifkan paket undangan Anda.</p>
-          <form action={async () => { "use server"; await signOut(); }}>
-             <Button variant="outline">Keluar</Button>
-          </form>
+          <h1 className="text-xl font-bold text-slate-800 mb-2">Data Tidak Ditemukan</h1>
+          <p className="text-slate-500 mb-6">User ini belum memiliki project undangan.</p>
+          {isAdminView && (
+             <a href="/admin"><Button variant="outline">Kembali ke Admin Panel</Button></a>
+          )}
         </div>
       </div>
     );
@@ -47,11 +68,26 @@ export default async function DashboardPage() {
   const attending = invitation.guests.filter(g => g.rsvpStatus === 'ATTENDING').length;
   const declined = invitation.guests.filter(g => g.rsvpStatus === 'DECLINED').length;
   const pending = invitation.guests.filter(g => g.rsvpStatus === 'PENDING').length;
-
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
+      
+      {/* Notifikasi Sedang dalam Mode Pantau (Admin) */}
+      {isAdminView && (
+        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-4 rounded-r shadow-sm flex justify-between items-center max-w-6xl mx-auto">
+            <p className="font-bold flex items-center gap-2">
+                <LayoutDashboard className="w-5 h-5"/>
+                Mode Admin: Sedang memantau dashboard milik Client.
+            </p>
+            <a href="/admin">
+                <Button size="sm" variant="outline" className="bg-white hover:bg-slate-50 border-amber-200">
+                    Kembali ke List
+                </Button>
+            </a>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* --- HEADER --- */}
@@ -68,19 +104,20 @@ export default async function DashboardPage() {
                   /{invitation.slug}
               </div>
               
-              <form action={async () => { 
-                "use server"; 
-                await signOut({ redirectTo: "/login" }); 
-              }}>
-                <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Keluar
-                </Button>
-              </form>
+              {/* Tombol Logout hanya muncul jika BUKAN Admin View (Client asli) */}
+              {!isAdminView && (
+                  <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
+                    <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50">
+                      <LogOut className="w-4 h-4 mr-2" /> Keluar
+                    </Button>
+                  </form>
+              )}
             </div>
         </header>
 
-        {/* --- STATISTIK --- */}
+        {/* ... (BAGIAN STATISTIK, FORM, TABEL SAMA SEPERTI SEBELUMNYA) ... */}
+        {/* Kode di bawah ini sama persis dengan file sebelumnya, copy paste saja bagian bawahnya */}
+        
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard icon={<Users className="text-blue-600"/>} label="Total Tamu" value={totalGuests} bg="bg-blue-50" border="border-blue-100" />
             <StatCard icon={<CheckCircle className="text-green-600"/>} label="Hadir" value={attending} bg="bg-green-50" border="border-green-100" />
@@ -88,17 +125,13 @@ export default async function DashboardPage() {
             <StatCard icon={<Clock className="text-yellow-600"/>} label="Menunggu" value={pending} bg="bg-yellow-50" border="border-yellow-100" />
         </div>
 
-        {/* --- FORM TAMBAH TAMU --- */}
         <GuestForm />
 
-        {/* --- TABEL DAFTAR TAMU --- */}
         <Card className="shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="border-b border-slate-100 bg-white px-6 py-4">
                 <CardTitle className="text-base font-bold text-slate-800 flex justify-between items-center">
                   <span>Daftar Tamu & Link Undangan</span>
-                  <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                    {totalGuests} Orang
-                  </span>
+                  <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">{totalGuests} Orang</span>
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -139,20 +172,10 @@ export default async function DashboardPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
-                                                <input 
-                                                  readOnly 
-                                                  value={uniqueLink} 
-                                                  className="text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1.5 flex-1 text-slate-600 truncate focus:outline-none" 
-                                                />
-                                                
-                                                {/* Tombol Kirim WA */}
+                                                <input readOnly value={uniqueLink} className="text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1.5 flex-1 text-slate-600 truncate focus:outline-none" />
                                                 <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                                                  <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-200 hover:bg-green-50">
-                                                      <MessageCircle className="w-4 h-4" />
-                                                  </Button>
+                                                  <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-200 hover:bg-green-50"><MessageCircle className="w-4 h-4" /></Button>
                                                 </a>
-
-                                                {/* PERBAIKAN: Menggunakan Component Khusus agar tidak bug */}
                                                 <CopyButton text={uniqueLink} />
                                             </div>
                                         </td>
@@ -160,16 +183,11 @@ export default async function DashboardPage() {
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
                                                 guest.rsvpStatus === 'ATTENDING' ? 'bg-green-100 text-green-700' : 
                                                 guest.rsvpStatus === 'DECLINED' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
-                                            }`}>
-                                                {guest.rsvpStatus === 'ATTENDING' ? 'Hadir' : 
-                                                 guest.rsvpStatus === 'DECLINED' ? 'Absen' : 'Pending'}
-                                            </span>
+                                            }`}>{guest.rsvpStatus === 'ATTENDING' ? 'Hadir' : guest.rsvpStatus === 'DECLINED' ? 'Absen' : 'Pending'}</span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <form action={async () => { "use server"; await deleteGuest(guest.id); }}>
-                                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-300 hover:text-red-600 hover:bg-red-50">
-                                                  <Trash2 className="w-4 h-4" />
-                                              </Button>
+                                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-300 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
                                             </form>
                                         </td>
                                     </tr>

@@ -19,7 +19,11 @@ export default async function InvitationPage(props: PageProps) {
   const invitation = await prisma.invitation.findUnique({
     where: { slug },
     include: {
-        wishes: { orderBy: { createdAt: 'desc' }, take: 10 }
+      wishes: {
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { guest: true }
+      }
     }
   });
 
@@ -39,9 +43,9 @@ export default async function InvitationPage(props: PageProps) {
 
   // 4. Render Template yang dipilih
   return (
-    <TemplateComponent 
-      invitation={invitation} 
-      guest={guest} 
+    <TemplateComponent
+      invitation={invitation}
+      guest={guest}
     />
   );
 }
