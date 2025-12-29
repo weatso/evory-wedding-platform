@@ -31,11 +31,11 @@ enum ThemeType {
 
 // --- 1. USER (Hanya Vendor & Client) ---
 model User {
-  id        String   @id @default(uuid())
+  id        String    @id @default(cuid())
   email     String   @unique
   password  String   // Wajib di-hash (bcrypt)
   name      String
-  role      Role     @default(CLIENT)
+  role      String    @default("USER") // ADMIN, USER, USHER
   
   // Client bisa punya banyak undangan (biasanya 1)
   invitations Invitation[]
@@ -86,23 +86,30 @@ model Guest {
   id            String   @id @default(uuid())
   name          String
   whatsapp      String   // Untuk kirim link
-  category      String?  // cth: VIP, Keluarga, Teman Kantor
+  category      String   @default("Regular")
+
+  guestCode     String   @unique  // Kode Unik Pendek (misal: "AB882") untuk input manual & QR
+  maxPax        Int      @default(2) // Jatah total kursi (diisi Client/Admin)
+  actualPax     Int      @default(0) // Jumlah yang check-in (diisi Usher)
+  
+  checkInTime DateTime? // Kapan pertama kali scan
   
   // TOKEN RAHASIA (Ini kuncinya!)
   // Tamu masuk via: webnikah.com/romeo-juliet?u=TOKEN_INI
-  token         String   @unique @default(cuid()) 
+  token         String   @unique @default(cuid())
   
   rsvpStatus    RsvpStatus @default(PENDING)
   pax           Int        @default(1) // Jumlah orang yang dibawa
   
   // Tamu melihat undangan mana?
   invitationId  String
-  invitation    Invitation @relation(fields: [invitationId], references: [id])
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
 
   // Relasi ke Ucapan (1 Tamu bisa kirim 1 ucapan)
   wishes        Wish[]
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // --- 4. WISH (Ucapan & Doa) ---
