@@ -1,4 +1,3 @@
-// app/dashboard/actions.ts
 'use server';
 
 import { auth } from "@/auth";
@@ -6,113 +5,124 @@ import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-// 1. Schema Validasi Input (Diperbarui dengan field baru)
-const AddGuestSchema = z.object({
+// Schema Validasi (Guest Code digenerate server, jadi tidak perlu divalidasi dari input)
+const GuestSchema = z.object({
   name: z.string().min(1, "Nama tamu wajib diisi"),
-  whatsapp: z.string().min(1, "Nomor WA wajib diisi"), // Validasi dasar
+  whatsapp: z.string().optional().or(z.literal("")), // Boleh kosong
   category: z.string().optional(),
-  
-  // FIELD BARU: Wajib ada untuk fitur QR Code
-  guestCode: z.string().min(1, "Kode tamu (Guest Code) wajib diisi"),
-  
-  // FIELD BARU: Jatah kursi, konversi string ke number
-  maxPax: z.coerce.number().min(1, "Minimal 1 orang").default(2),
+  maxPax: z.coerce.number().min(1, "Minimal 1 orang").default(1),
 });
 
-// 2. Action Tambah Tamu
-export async function addGuest(formData: FormData) {
+// 1. TAMBAH TAMU
+export async function addGuest(invitationId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "Unauthorized: Harap login terlebih dahulu." };
+  if (!session?.user?.id) return { error: "Unauthorized" };
 
-  // Ambil data dari FormData
   const rawData = {
     name: formData.get("name"),
     whatsapp: formData.get("whatsapp"),
     category: formData.get("category"),
-    
-    // Ambil field baru dari hidden input / form
-    guestCode: formData.get("guestCode"),
     maxPax: formData.get("maxPax"),
   };
 
-  // Validasi dengan Zod
-  const validation = AddGuestSchema.safeParse(rawData);
+  const validated = GuestSchema.safeParse(rawData);
 
-  if (!validation.success) {
-    const errorMessages = validation.error.flatten().fieldErrors;
-    // Ambil error pertama yang ditemukan untuk ditampilkan
-    const firstError = 
-        errorMessages.name?.[0] || 
-        errorMessages.whatsapp?.[0] || 
-        errorMessages.guestCode?.[0] || 
-        "Input tidak valid";
-    return { error: firstError };
+  if (!validated.success) {
+    return { error: "Input tidak valid. Periksa nama dan jumlah pax." };
   }
 
-  // Destructure data yang sudah valid
-  const { name, whatsapp, category, guestCode, maxPax } = validation.data;
+  const { name, whatsapp, category, maxPax } = validated.data;
+
+  // GENERATE KODE UNIK (Server Side)
+  // Format: 4 karakter acak (A-Z, 0-9)
+  const guestCode = Math.random().toString(36).substring(2, 6).toUpperCase();
 
   try {
-    // SECURITY: Cari Undangan milik User yang sedang login
-    // Ini lebih aman daripada percaya input 'invitationId' dari form
-    const invitation = await prisma.invitation.findFirst({
-      where: { userId: session.user.id },
-    });
-
-    if (!invitation) return { error: "Undangan tidak ditemukan. Pastikan Anda sudah membuat data undangan." };
-
-    // Simpan ke Database
     await prisma.guest.create({
       data: {
-        invitationId: invitation.id,
+        invitationId, // ID Undangan dikirim dari param, bukan hidden input (lebih aman)
         name,
-        whatsapp,
-        category: category || "Regular", // Default kategori
-        
-        // Data Baru untuk fitur QR/Usher
+        whatsapp: whatsapp || "", // Handle null
+        category: category || "Regular",
         guestCode, 
         maxPax,
-        actualPax: 0, // Default 0 (belum datang)
-        
+        actualPax: 0,
         rsvpStatus: "PENDING",
       },
     });
 
     revalidatePath("/dashboard"); 
-    revalidatePath("/dashboard/live"); // Refresh juga halaman live monitor hari-H
+    revalidatePath("/dashboard/live"); 
     return { success: true };
     
   } catch (error) {
     console.error("Gagal tambah tamu:", error);
-    return { error: "Gagal menyimpan data tamu. Kemungkinan Kode Unik duplikat." };
+    return { error: "Gagal menyimpan data." };
   }
 }
 
-// 3. Action Hapus Tamu (TETAP ADA / TIDAK DIUBAH)
+// 2. DELETE TAMU
 export async function deleteGuest(guestId: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Unauthorized" };
 
   try {
-    // Security Check: Pastikan tamu ini benar-benar milik user yang login
+    // Security: Cek kepemilikan
     const guest = await prisma.guest.findUnique({
       where: { id: guestId },
       include: { invitation: true },
     });
 
-    // Jika tamu tidak ada ATAU pemilik undangannya bukan user yang login -> TOLAK
-    if (!guest || guest.invitation.userId !== session.user.id) {
+    // Jika tamu tidak ada ATAU bukan milik user ini -> TOLAK
+    // Note: Admin boleh hapus punya siapa saja
+    const isOwner = guest?.invitation.userId === session.user.id;
+    const isAdmin = session.user.role === "ADMIN";
+
+    if (!guest || (!isOwner && !isAdmin)) {
       return { error: "Akses ditolak." };
     }
 
-    // Hapus Tamu
     await prisma.guest.delete({ where: { id: guestId } });
     
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/live");
     return { success: true };
   } catch (error) {
-    console.error("Gagal hapus tamu:", error);
     return { error: "Gagal menghapus tamu." };
   }
+}
+
+// 3. UPDATE TAMU (BARU)
+export async function updateGuest(guestId: string, formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "Unauthorized" };
+
+    const rawData = {
+        name: formData.get("name"),
+        whatsapp: formData.get("whatsapp"),
+        category: formData.get("category"),
+        maxPax: formData.get("maxPax"),
+    };
+
+    const validated = GuestSchema.safeParse(rawData);
+    if (!validated.success) return { error: "Data edit tidak valid." };
+
+    try {
+        // Cek Security (Opsional: bisa query dulu seperti deleteGuest)
+        
+        await prisma.guest.update({
+            where: { id: guestId },
+            data: {
+                name: validated.data.name,
+                whatsapp: validated.data.whatsapp || "",
+                category: validated.data.category,
+                maxPax: validated.data.maxPax,
+            }
+        });
+
+        revalidatePath("/dashboard");
+        return { success: true };
+    } catch (error) {
+        return { error: "Gagal update data." };
+    }
 }

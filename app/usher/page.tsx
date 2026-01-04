@@ -8,10 +8,16 @@ import { QrCode, MonitorPlay, LogOut, Calendar, MapPin, Clock } from "lucide-rea
 
 export default async function UsherDashboard() {
   const session = await auth();
-  
-  // Security: Hanya Usher dan Admin yang boleh masuk
-  if (!session || (session.user.role !== "USHER" && session.user.role !== "ADMIN")) {
-      return <div className="p-10 text-center">Akses Ditolak. Halaman ini khusus Staff/Usher.</div>;
+    
+  // 1. Jika belum login sama sekali -> Lempar ke Login
+  if (!session) {
+      redirect("/login");
+  }
+
+  // 2. Jika sudah login TAPI bukan Usher/Admin -> Lempar ke Dashboard Client (atau 404)
+  if (session.user.role !== "USHER" && session.user.role !== "ADMIN") {
+      redirect("/dashboard"); 
+      // Atau bisa return <div>Akses Ditolak</div> tapi redirect lebih UX friendly
   }
 
   // Ambil semua undangan yang AKTIF
@@ -75,7 +81,7 @@ export default async function UsherDashboard() {
                             
                             <div className="grid grid-cols-2 gap-3 mt-2">
                                 {/* TOMBOL SCANNER SPESIFIK */}
-                                <Link href={`/admin/scan?id=${wedding.id}`}>
+                                <Link href={`/usher/scan?id=${wedding.id}`}>
                                     <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold">
                                         <QrCode className="w-4 h-4 mr-2" />
                                         Scan Tamu

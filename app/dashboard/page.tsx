@@ -1,216 +1,265 @@
-// app/dashboard/page.tsx
-import { auth } from "@/auth";
+import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Users, 
-  Trash2, 
-  MessageCircle, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  LogOut,
-  LayoutDashboard 
-} from "lucide-react";
-import { deleteGuest } from "./actions";
 import GuestForm from "./GuestForm";
-import { signOut } from "@/auth";
-import { CopyButton } from "@/components/ui/copy-button"; 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Users, ExternalLink, QrCode, LogOut } from "lucide-react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import GuestRowActions from "./GuestRowActions";
 
-export const dynamic = 'force-dynamic';
+type Props = {
+  searchParams: Promise<{ viewAs?: string }>;
+};
 
-interface PageProps {
-  searchParams: Promise<{ viewAs?: string }>; // Menangkap param viewAs
-}
-
-export default async function DashboardPage(props: PageProps) {
+export default async function DashboardPage(props: Props) {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  
+  // 1. Cek Login Dasar
+  if (!session) redirect("/login");
 
+  // 2. Baca Params DULU (Penting untuk pengecualian Admin)
   const searchParams = await props.searchParams;
   const viewAsId = searchParams.viewAs;
+  const userRole = session.user.role;
 
-  // --- LOGIKA GOD MODE (ADMIN VIEW) ---
-  // Defaultnya targetUserId adalah diri sendiri
-  let targetUserId = session.user.id;
-  let isAdminView = false;
-
-  // TAPI, jika user adalah ADMIN dan ada request 'viewAs', ganti targetnya
-  if (session.user.role === "ADMIN" && viewAsId) {
-    targetUserId = viewAsId;
-    isAdminView = true;
+  // =========================================================
+  // 3. SISTEM ANTI-NYASAR (DIPERBAIKI)
+  // =========================================================
+  
+  if (userRole === "ADMIN") {
+      // PERBAIKAN: Hanya tendang Admin jika TIDAK sedang mode "View As"
+      if (!viewAsId) {
+          redirect("/admin");
+      }
+      // Jika ada viewAsId, Admin BOLEH lanjut (untuk mengintip)
+  } 
+  
+  if (userRole === "USHER") {
+      redirect("/usher"); // Usher tetap tidak boleh masuk sini sama sekali
   }
+  // =========================================================
 
-  // Ambil Data Undangan berdasarkan targetUserId
+  
+  // 4. Tentukan User ID Siapa yang Mau Dilihat
+  // Jika Admin & ada viewAsId -> Pakai ID Client tersebut
+  // Jika Client biasa -> Pakai ID sendiri
+  const targetUserId = (userRole === "ADMIN" && viewAsId) ? viewAsId : session.user.id; 
+
+  // 5. Ambil Data Undangan
   const invitation = await prisma.invitation.findFirst({
     where: { userId: targetUserId },
-    include: { guests: { orderBy: { createdAt: 'desc' } } }
+    include: { 
+        guests: {
+            orderBy: { createdAt: 'desc' }
+        } 
+    },
   });
 
-  // Jika Undangan tidak ditemukan
+  // 6. Tampilan Jika Data Belum Ada
   if (!invitation) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white p-8 rounded-xl shadow-sm text-center max-w-md border border-slate-200">
-          <h1 className="text-xl font-bold text-slate-800 mb-2">Data Tidak Ditemukan</h1>
-          <p className="text-slate-500 mb-6">User ini belum memiliki project undangan.</p>
-          {isAdminView && (
-             <a href="/admin"><Button variant="outline">Kembali ke Admin Panel</Button></a>
-          )}
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
+        <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Data Tidak Ditemukan</h2>
+            <p className="text-slate-500 mb-6 text-sm">
+                {userRole === "ADMIN" 
+                    ? "User Client ini belum membuat data pernikahan." 
+                    : "Akun Anda belum memiliki data pernikahan."}
+            </p>
+            
+            <Link href={userRole === "ADMIN" ? "/admin" : "/login"}>
+                <Button variant="outline">Kembali</Button>
+            </Link>
         </div>
       </div>
     );
   }
 
+  // 7. Hitung Statistik
   const totalGuests = invitation.guests.length;
-  const attending = invitation.guests.filter(g => g.rsvpStatus === 'ATTENDING').length;
-  const declined = invitation.guests.filter(g => g.rsvpStatus === 'DECLINED').length;
-  const pending = invitation.guests.filter(g => g.rsvpStatus === 'PENDING').length;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const totalPax = invitation.guests.reduce((sum, guest) => sum + guest.maxPax, 0);
+  const confirmedGuests = invitation.guests.filter(g => g.rsvpStatus === "ATTENDING").length;
+  const confirmedPax = invitation.guests
+    .filter(g => g.rsvpStatus === "ATTENDING")
+    .reduce((sum, g) => sum + g.maxPax, 0);
+
+  // Jika Admin sedang mengintip, tampilkan Banner Peringatan
+  const isAdminViewing = userRole === "ADMIN" && viewAsId;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
-      
-      {/* Notifikasi Sedang dalam Mode Pantau (Admin) */}
-      {isAdminView && (
-        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-4 rounded-r shadow-sm flex justify-between items-center max-w-6xl mx-auto">
-            <p className="font-bold flex items-center gap-2">
-                <LayoutDashboard className="w-5 h-5"/>
-                Mode Admin: Sedang memantau dashboard milik Client.
-            </p>
-            <a href="/admin">
-                <Button size="sm" variant="outline" className="bg-white hover:bg-slate-50 border-amber-200">
-                    Kembali ke List
-                </Button>
-            </a>
-        </div>
-      )}
-
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* --- HEADER --- */}
-        <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+     <div className="min-h-screen bg-slate-50 p-4 md:p-10 font-sans">
+       
+       {/* BANNER MODE INTIP ADMIN */}
+       {isAdminViewing && (
+         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded shadow-sm flex justify-between items-center">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Wedding Dashboard</h1>
-                <p className="text-slate-500 text-sm mt-1">
-                  Mempelai: <span className="font-semibold text-slate-700">{invitation.groomNick} & {invitation.brideNick}</span>
-                </p>
+                <p className="font-bold">Mode Pantau Admin</p>
+                <p className="text-xs">Anda sedang melihat dashboard milik client: <b>{invitation.groomNick} & {invitation.brideNick}</b></p>
             </div>
+            <Link href="/admin">
+                <Button size="sm" variant="outline" className="border-amber-300 hover:bg-amber-200 text-amber-800">
+                    Kembali ke Admin
+                </Button>
+            </Link>
+         </div>
+       )}
+
+       <div className="max-w-6xl mx-auto space-y-8">
             
-            <div className="flex gap-3 items-center">
-              <div className="bg-slate-100 px-3 py-1.5 rounded-md border text-xs font-mono text-slate-600">
-                  /{invitation.slug}
-              </div>
-              
-              {/* Tombol Logout hanya muncul jika BUKAN Admin View (Client asli) */}
-              {!isAdminView && (
-                  <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50">
-                      <LogOut className="w-4 h-4 mr-2" /> Keluar
-                    </Button>
-                  </form>
-              )}
-            </div>
-        </header>
-
-        {/* ... (BAGIAN STATISTIK, FORM, TABEL SAMA SEPERTI SEBELUMNYA) ... */}
-        {/* Kode di bawah ini sama persis dengan file sebelumnya, copy paste saja bagian bawahnya */}
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard icon={<Users className="text-blue-600"/>} label="Total Tamu" value={totalGuests} bg="bg-blue-50" border="border-blue-100" />
-            <StatCard icon={<CheckCircle className="text-green-600"/>} label="Hadir" value={attending} bg="bg-green-50" border="border-green-100" />
-            <StatCard icon={<XCircle className="text-red-600"/>} label="Tidak Hadir" value={declined} bg="bg-red-50" border="border-red-100" />
-            <StatCard icon={<Clock className="text-yellow-600"/>} label="Menunggu" value={pending} bg="bg-yellow-50" border="border-yellow-100" />
-        </div>
-
-        <GuestForm />
-
-        <Card className="shadow-sm border-slate-200 overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-white px-6 py-4">
-                <CardTitle className="text-base font-bold text-slate-800 flex justify-between items-center">
-                  <span>Daftar Tamu & Link Undangan</span>
-                  <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">{totalGuests} Orang</span>
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider border-b border-slate-100">
-                            <tr>
-                                <th className="px-6 py-3 w-[25%]">Nama Tamu</th>
-                                <th className="px-6 py-3 w-[45%]">Link Personal</th>
-                                <th className="px-6 py-3 w-[15%] text-center">Status RSVP</th>
-                                <th className="px-6 py-3 w-[15%] text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
-                            {invitation.guests.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="px-6 py-16 text-center text-slate-400">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Users className="w-8 h-8 text-slate-200" />
-                                            <p>Belum ada tamu.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                invitation.guests.map((guest) => {
-                                    const uniqueLink = `${baseUrl}/invitation/${invitation.slug}?u=${guest.token}`;
-                                    const waMessage = `Kepada Yth. ${guest.name},\n\nTanpa mengurangi rasa hormat, mohon kehadiran Anda di pernikahan kami. Info lengkap: ${uniqueLink}`;
-                                    const waUrl = `https://wa.me/${guest.whatsapp?.replace(/^0/, '62').replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`;
-
-                                    return (
-                                    <tr key={guest.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium text-slate-900">{guest.name}</div>
-                                            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                                              <span className="bg-slate-100 px-1.5 rounded">{guest.category || 'Umum'}</span>
-                                              <span>• {guest.whatsapp}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <input readOnly value={uniqueLink} className="text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1.5 flex-1 text-slate-600 truncate focus:outline-none" />
-                                                <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                                                  <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-200 hover:bg-green-50"><MessageCircle className="w-4 h-4" /></Button>
-                                                </a>
-                                                <CopyButton text={uniqueLink} />
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                                                guest.rsvpStatus === 'ATTENDING' ? 'bg-green-100 text-green-700' : 
-                                                guest.rsvpStatus === 'DECLINED' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
-                                            }`}>{guest.rsvpStatus === 'ATTENDING' ? 'Hadir' : guest.rsvpStatus === 'DECLINED' ? 'Absen' : 'Pending'}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <form action={async () => { "use server"; await deleteGuest(guest.id); }}>
-                                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-300 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                )})
-                            )}
-                        </tbody>
-                    </table>
+            {/* HEADER DASHBOARD */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Wedding Dashboard</h1>
+                    <p className="text-slate-500 mt-1 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        Halo, {invitation.groomNick} & {invitation.brideNick}
+                    </p>
                 </div>
-            </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    <Link href={`/invitation/${invitation.slug}`} target="_blank" className="flex-1 md:flex-none">
+                        <Button variant="outline" className="gap-2 w-full border-slate-300 hover:bg-slate-50 text-slate-700">
+                            <ExternalLink className="w-4 h-4"/> 
+                            <span className="hidden sm:inline">Lihat</span> Web
+                        </Button>
+                    </Link>
+                    <Link href={`/dashboard/live${isAdminViewing ? `?id=${invitation.id}` : ''}`} className="flex-1 md:flex-none">
+                         <Button className="bg-amber-600 hover:bg-amber-700 text-white gap-2 w-full shadow-amber-900/10 shadow-lg">
+                            <QrCode className="w-4 h-4"/> 
+                            Live <span className="hidden sm:inline">Monitor</span>
+                         </Button>
+                    </Link>
+                    
+                    {!isAdminViewing && (
+                        <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
+                            <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50" title="Logout">
+                                <LogOut className="w-4 h-4" />
+                            </Button>
+                        </form>
+                    )}
+                </div>
+            </div>
 
-function StatCard({ icon, label, value, bg, border }: { icon: any, label: string, value: number, bg: string, border: string }) {
-  return (
-    <Card className={`shadow-sm ${border}`}>
-        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <div className={`p-2 rounded-full mb-2 ${bg}`}>{icon}</div>
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-widest">{label}</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-        </CardContent>
-    </Card>
-  )
+            {/* KARTU STATISTIK */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="col-span-2 md:col-span-1 border-l-4 border-l-slate-400 shadow-sm">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-slate-400 tracking-wider">Total Undangan</CardTitle></CardHeader>
+                    <CardContent><div className="text-3xl font-bold text-slate-800">{totalGuests} <span className="text-sm font-normal text-slate-400">Grup</span></div></CardContent>
+                </Card>
+                <Card className="col-span-2 md:col-span-1 border-l-4 border-l-blue-500 shadow-sm">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-slate-400 tracking-wider">Total Kursi (Pax)</CardTitle></CardHeader>
+                    <CardContent><div className="text-3xl font-bold text-blue-600">{totalPax} <span className="text-sm font-normal text-slate-400">Org</span></div></CardContent>
+                </Card>
+                <Card className="border-l-4 border-l-green-500 shadow-sm bg-green-50/50 border-0">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-green-700 tracking-wider">Siap Hadir</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-green-700">{confirmedGuests} <span className="text-sm font-normal opacity-70">Grup</span></div>
+                        <p className="text-xs text-green-600 mt-1">{confirmedPax} Pax terkonfirmasi</p>
+                    </CardContent>
+                </Card>
+                <Card className="border-l-4 border-l-amber-500 shadow-sm bg-amber-50/50 border-0">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-amber-700 tracking-wider">Menunggu</CardTitle></CardHeader>
+                    <CardContent><div className="text-3xl font-bold text-amber-700">{totalGuests - confirmedGuests} <span className="text-sm font-normal opacity-70">Grup</span></div></CardContent>
+                </Card>
+            </div>
+
+            <Separator />
+
+            {/* AREA UTAMA: FORM & TABEL */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                
+                {/* KOLOM KIRI: FORM TAMBAH TAMU */}
+                <div className="lg:col-span-1 lg:sticky lg:top-8">
+                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-1 rounded-xl shadow-xl">
+                        <div className="bg-slate-50 text-slate-900 rounded-lg">
+                             <GuestForm invitationId={invitation.id} />
+                        </div>
+                    </div>
+                    {/* Tips hanya muncul buat pemilik asli, admin ga perlu */}
+                    {!isAdminViewing && (
+                        <div className="mt-4 p-4 bg-blue-50 text-blue-800 rounded-lg text-xs border border-blue-100">
+                            <p className="font-bold mb-1">💡 Tips:</p>
+                            Setelah tamu disimpan, kirim link undangan ke WhatsApp mereka.
+                        </div>
+                    )}
+                </div>
+
+                {/* KOLOM KANAN: TABEL DATA */}
+                <div className="lg:col-span-2">
+                    <Card className="border-slate-200 shadow-md overflow-hidden">
+                        <CardHeader className="bg-white border-b border-slate-100 flex flex-row justify-between items-center">
+                            <CardTitle className="text-lg text-slate-800">Daftar Buku Tamu</CardTitle>
+                            <Badge variant="outline" className="text-slate-500">{invitation.guests.length} Data</Badge>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+    <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
+        <tr>
+            <th className="px-6 py-4">Nama Tamu</th>
+            <th className="px-6 py-4">Kategori</th>
+            <th className="px-6 py-4">Status RSVP</th>
+            <th className="px-6 py-4 text-center">Jatah Kursi</th>
+            <th className="px-6 py-4 text-right">Aksi</th> {/* TAMBAHAN KOLOM AKSI */}
+        </tr>
+    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                        {invitation.guests.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="p-12 text-center text-slate-400 flex flex-col items-center">
+                                                    <Users className="w-10 h-10 mb-3 opacity-20" />
+                                                    <p>Belum ada tamu yang ditambahkan.</p>
+                                                </td>
+                                            </tr>
+                                        ) : invitation.guests.map((g) => (
+                                            <tr key={g.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-slate-800">{g.name}</div>
+                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
+                                                        <span className="bg-slate-100 px-1 rounded">#{g.guestCode}</span>
+                                                        <span className="hidden group-hover:inline text-slate-300">• {g.whatsapp}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold border ${g.category === 'VIP' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+                                                        {g.category}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {g.rsvpStatus === 'ATTENDING' && (
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Hadir
+                                                        </span>
+                                                    )}
+                                                    {g.rsvpStatus === 'PENDING' && (
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span> Belum Respon
+                                                        </span>
+                                                    )}
+                                                    {g.rsvpStatus === 'DECLINED' && (
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Maaf, Absen
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-center font-mono text-slate-600">
+                                                    {g.maxPax}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                    <GuestRowActions guest={g} />
+                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+       </div>
+     </div>
+  );
 }
