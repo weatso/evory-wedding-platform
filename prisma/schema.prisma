@@ -1,76 +1,70 @@
-// prisma/schema.prisma
+// --------------------------------------
+// KONFIGURASI CLIENT & DATABASE
+// --------------------------------------
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql" // Ganti ke "mysql" jika Anda menggunakan MySQL
+  url      = env("DATABASE_URL")
 }
 
-// --- ENUMS ---
-enum Role {
-  ADMIN   // Anda (Vendor)
-  CLIENT  // Mempelai (Hanya lihat tamu)
+// --------------------------------------
+// 1. USER & AUTH (Vendor / Admin / Usher)
+// --------------------------------------
+
+enum UserRole {
+  ADMIN
+  CLIENT
+  USHER
 }
 
-enum RsvpStatus {
-  PENDING
-  ATTENDING
-  DECLINED
-}
-
-enum ThemeType {
-  RUSTIC_A
-  LUXURY_GOLD
-  MINIMALIST_B
-  CUSTOM_CODE // Jika undangan ini codingan khusus
-}
-
-// --- 1. USER (Hanya Vendor & Client) ---
 model User {
-  id        String    @id @default(cuid())
+  id        String   @id @default(uuid())
   email     String   @unique
-  password  String   // Wajib di-hash (bcrypt)
-  name      String
-  role      String    @default("USER") // ADMIN, USER, USHER
+  password  String   // Hashed password
+  name      String?
+  role      UserRole @default(CLIENT)
   
-  // Client bisa punya banyak undangan (biasanya 1)
-  invitations Invitation[]
+  invitations Invitation[] // Satu user (vendor) bisa mengelola banyak undangan
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// --- 2. INVITATION (Pusat Data) ---
+// --------------------------------------
+// 2. INVITATION (Inti Sistem)
+// --------------------------------------
+
 model Invitation {
   id            String   @id @default(uuid())
-  slug          String   @unique // cth: romeo-juliet
+  slug          String   @unique // URL unik, cth: evory.id/romeo-juliet
   
-  // Konfigurasi Tampilan
-  theme         ThemeType @default(RUSTIC_A)
-  isActive      Boolean   @default(true) // Switch On/Off undangan
+  // --- KONFIGURASI TAMPILAN (Logic Template) ---
+  templateId    String   @default("RUSTIC_A") // ID untuk memilih file template di Registry
+  themeConfig   Json?    // JSON object untuk simpan warna, font, aset custom per user
+  isActive      Boolean  @default(true)
   
-  // Data Mempelai (Diinput oleh Vendor)
+  // --- DATA MEMPELAI ---
   groomName     String
   groomNick     String
-  groomFather   String
-  groomMother   String
+  groomFather   String?
+  groomMother   String?
   
   brideName     String
   brideNick     String
-  brideFather   String
-  brideMother   String
+  brideFather   String?
+  brideMother   String?
   
-  // Data Acara 
+  // --- DATA ACARA ---
   eventDate     DateTime
   eventTime     String   @default("08:00 WIB - Selesai")
   location      String
   mapUrl        String?
   
-  // Relasi ke Client (Pemilik Acara)
+  // --- RELASI ---
   userId        String?
   user          User?    @relation(fields: [userId], references: [id])
 
@@ -81,47 +75,53 @@ model Invitation {
   updatedAt     DateTime @updatedAt
 }
 
-// --- 3. GUEST (Tamu Undangan) ---
-model Guest {
-  id            String   @id @default(uuid())
-  name          String
-  whatsapp      String   // Untuk kirim link
-  category      String   @default("Regular")
+// --------------------------------------
+// 3. GUEST & RSVP (Tamu & Tiket)
+// --------------------------------------
 
-  guestCode     String   @unique  // Kode Unik Pendek (misal: "AB882") untuk input manual & QR
-  maxPax        Int      @default(2) // Jatah total kursi (diisi Client/Admin)
-  actualPax     Int      @default(0) // Jumlah yang check-in (diisi Usher)
-  
-  checkInTime DateTime? // Kapan pertama kali scan
-  
-  // TOKEN RAHASIA (Ini kuncinya!)
-  // Tamu masuk via: webnikah.com/romeo-juliet?u=TOKEN_INI
-  token         String   @unique @default(cuid())
-  
-  rsvpStatus    RsvpStatus @default(PENDING)
-  pax           Int        @default(1) // Jumlah orang yang dibawa
-  
-  // Tamu melihat undangan mana?
-  invitationId  String
-  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
-
-  // Relasi ke Ucapan (1 Tamu bisa kirim 1 ucapan)
-  wishes        Wish[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum RsvpStatus {
+  PENDING
+  ATTENDING
+  DECLINED
 }
 
-// --- 4. WISH (Ucapan & Doa) ---
+model Guest {
+  id           String     @id @default(uuid())
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  
+  name         String
+  category     String?    // Cth: VIP, Keluarga, Teman Kantor
+  guestCode    String     @unique // Kode Unik untuk URL Login & QR Code (cth: AB12CD)
+  
+  // --- RSVP DATA ---
+  rsvpStatus   RsvpStatus @default(PENDING)
+  pax          Int        @default(1) // Jumlah orang yang AKTUAL hadir (diisi saat RSVP)
+  totalPaxAllocated Int   @default(1) // Jatah kursi MAKSIMAL yang diberikan (diisi Admin)
+
+  // --- CHECK-IN LOGIC (Scanner) ---
+  isCheckedIn  Boolean    @default(false)
+  checkInTime  DateTime?
+
+  wishes       Wish[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// --------------------------------------
+// 4. WISHES (Ucapan & Doa)
+// --------------------------------------
+
 model Wish {
-  id            String   @id @default(uuid())
-  message       String
+  id           String     @id @default(uuid())
+  message      String     @db.Text
   
-  guestId       String
-  guest         Guest    @relation(fields: [guestId], references: [id])
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   
-  invitationId  String
-  invitation    Invitation @relation(fields: [invitationId], references: [id])
+  guestId      String?
+  guest        Guest?     @relation(fields: [guestId], references: [id])
   
-  createdAt     DateTime @default(now())
+  createdAt    DateTime   @default(now())
 }

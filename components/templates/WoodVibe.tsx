@@ -1,24 +1,22 @@
 'use client';
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
+import QRCode from "react-qr-code"; 
+import { Play, Pause, MapPin, Calendar, Clock, Check, Copy, Ticket } from "lucide-react";
+
+// Imports internal (sesuaikan dengan struktur project Anda)
 import { submitRsvp } from "@/app/invitation/actions";
 import { useCountdown, useAudio } from "@/hooks/use-wedding"; 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { Play, Pause, MapPin, Calendar, Clock, Check, Copy, Ticket } from "lucide-react";
-import Image from "next/image";
-import QRCode from "react-qr-code"; // <-- IMPORT BARU
+import { WeddingTemplateProps } from "@/types/template";
 
-// --- TIPE DATA ---
-type InvitationProps = {
-    invitation: any;
-    guest: any | null;
-};
 
-export default function WoodVibe({ invitation, guest }: InvitationProps) {
+export default function WoodVibe({ invitation, guest, config }: WeddingTemplateProps) {
     
-    // 1. LOGIKA COUNTDOWN (Pintar membaca jam)
+    // 1. LOGIKA COUNTDOWN (Parsing Jam Event)
     const targetDateStr = useMemo(() => {
         const dateObj = new Date(invitation.eventDate);
         const dateIso = dateObj.toISOString().split('T')[0]; 
@@ -145,7 +143,7 @@ export default function WoodVibe({ invitation, guest }: InvitationProps) {
             {/* GIFT */}
             <GiftSection invitation={invitation} />
 
-            {/* --- NEW: TIKET DIGITAL QR CODE --- */}
+            {/* TIKET DIGITAL QR CODE */}
             {guest && guest.rsvpStatus === 'ATTENDING' ? (
                 <TicketSection guest={guest} />
             ) : guest && (
@@ -158,6 +156,7 @@ export default function WoodVibe({ invitation, guest }: InvitationProps) {
                     </div>
                 </section>
             )}
+            
             <footer className="py-12 text-center text-[10px] text-stone-400 font-sans bg-stone-900 uppercase tracking-widest">
                 <p className="mb-2">Wedding of {invitation.groomNick} & {invitation.brideNick}</p>
                 <p>Powered by <span className="text-amber-500 font-bold">WebNikah</span></p>
@@ -170,7 +169,6 @@ export default function WoodVibe({ invitation, guest }: InvitationProps) {
 // SUB-COMPONENTS
 // ==========================================
 
-// --- COMPONENT BARU: TIKET DIGITAL ---
 function TicketSection({ guest }: { guest: any }) {
     if (!guest) return null;
 
@@ -195,7 +193,6 @@ function TicketSection({ guest }: { guest: any }) {
 
                     {/* QR Code Area */}
                     <div className="bg-white p-2 rounded-lg border-2 border-stone-100 inline-block mb-4">
-                        {/* VALUE QR ADALAH GUEST CODE (Kode Pendek) AGAR MUDAH DI SCAN */}
                         <QRCode 
                             value={guest.guestCode || guest.token || "ERROR"} 
                             size={180} 
@@ -377,39 +374,39 @@ function RsvpForm({ guest }: { guest: any }) {
                  setIsSubmitting(false);
              }} 
              className="space-y-5"
-           >
-               <input type="hidden" name="guestId" value={guest.id} />
-               <div className="space-y-1">
-                   <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Nama Tamu</label>
-                   <Input value={guest.name} disabled className="bg-stone-50 border-stone-200 text-stone-600 font-sans" />
-               </div>
-               <div className="space-y-3">
-                   <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Kehadiran</label>
-                   <div className="flex gap-3">
-                       <label className="flex items-center justify-center gap-2 border border-stone-200 p-3 rounded-lg flex-1 cursor-pointer has-checked:bg-amber-50 has-checked:border-amber-500 has-checked:text-amber-900 transition-all hover:bg-stone-50 bg-white">
-                           <input type="radio" name="status" value="ATTENDING" required className="accent-amber-600 w-4 h-4" />
-                           <span className="text-sm font-medium">Hadir</span>
-                       </label>
-                       <label className="flex items-center justify-center gap-2 border border-stone-200 p-3 rounded-lg flex-1 cursor-pointer has-checked:bg-stone-100 has-checked:border-stone-400 has-checked:text-stone-600 transition-all hover:bg-stone-50 bg-white">
-                           <input type="radio" name="status" value="DECLINED" required className="accent-stone-600 w-4 h-4" />
-                           <span className="text-sm font-medium">Maaf, Absen</span>
-                       </label>
-                   </div>
-               </div>
-               <div className="space-y-1">
-                   <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Jumlah Tamu</label>
-                   <select name="pax" className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20">
-                       <option value="1">1 Orang</option>
-                       <option value="2">2 Orang</option>
-                   </select>
-               </div>
-               <div className="space-y-1">
-                   <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Ucapan & Doa</label>
-                   <Textarea name="message" placeholder="Tulis doa restu Anda..." className="bg-white border-stone-200 font-sans min-h-[100px]" />
-               </div>
-               <Button className="w-full bg-amber-800 hover:bg-amber-900 text-white py-6 text-sm uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
-                   {isSubmitting ? "Mengirim..." : "Kirim Konfirmasi"}
-               </Button>
-           </form>
+            >
+                <input type="hidden" name="guestId" value={guest.id} />
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Nama Tamu</label>
+                    <Input value={guest.name} disabled className="bg-stone-50 border-stone-200 text-stone-600 font-sans" />
+                </div>
+                <div className="space-y-3">
+                    <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Kehadiran</label>
+                    <div className="flex gap-3">
+                        <label className="flex items-center justify-center gap-2 border border-stone-200 p-3 rounded-lg flex-1 cursor-pointer has-checked:bg-amber-50 has-checked:border-amber-500 has-checked:text-amber-900 transition-all hover:bg-stone-50 bg-white">
+                            <input type="radio" name="status" value="ATTENDING" required className="accent-amber-600 w-4 h-4" />
+                            <span className="text-sm font-medium">Hadir</span>
+                        </label>
+                        <label className="flex items-center justify-center gap-2 border border-stone-200 p-3 rounded-lg flex-1 cursor-pointer has-checked:bg-stone-100 has-checked:border-stone-400 has-checked:text-stone-600 transition-all hover:bg-stone-50 bg-white">
+                            <input type="radio" name="status" value="DECLINED" required className="accent-stone-600 w-4 h-4" />
+                            <span className="text-sm font-medium">Maaf, Absen</span>
+                        </label>
+                    </div>
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Jumlah Tamu</label>
+                    <select name="pax" className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20">
+                        <option value="1">1 Orang</option>
+                        <option value="2">2 Orang</option>
+                    </select>
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">Ucapan & Doa</label>
+                    <Textarea name="message" placeholder="Tulis doa restu Anda..." className="bg-white border-stone-200 font-sans min-h-[100px]" />
+                </div>
+                <Button className="w-full bg-amber-800 hover:bg-amber-900 text-white py-6 text-sm uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
+                    {isSubmitting ? "Mengirim..." : "Kirim Konfirmasi"}
+                </Button>
+            </form>
     )
 }

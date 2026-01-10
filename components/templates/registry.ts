@@ -1,28 +1,31 @@
 // components/templates/registry.ts
+import dynamic from "next/dynamic";
+import { ComponentType } from "react";
+import { WeddingTemplateProps } from "@/types/template"; // Pastikan interface ini ada
 
-import WoodVibe from "@/components/templates/WoodVibe";
+// 1. Import Static untuk Template Default (Mencegah layout shift/loading di awal)
+import WoodVibe from "@/components/templates/WoodVibe"; 
 
-// Mapping antara ThemeType (Database) dengan Component (File React)
-// Key di sini HARUS sama persis dengan enum ThemeType di prisma/schema.prisma
-// yaitu: RUSTIC_A, LUXURY_GOLD, MINIMALIST_B, CUSTOM_CODE
+// 2. Tipe Data Registry (Memastikan semua komponen mematuhi kontrak Props)
+export const templateRegistry: Record<string, ComponentType<WeddingTemplateProps>> = {
+  // --- KATALOG STANDAR ---
+  "RUSTIC_A": WoodVibe, // Default
 
-export const templateRegistry: Record<string, any> = {
-  "RUSTIC_A": WoodVibe,
-
-  // Karena template lain belum dibuat, kita arahkan sementara ke WoodVibe (Fallback)
-  // Ini mencegah error jika di database tersetting 'LUXURY_GOLD' tapi filenya belum ada.
-  "LUXURY_GOLD": WoodVibe,     
-  "MINIMALIST_B": WoodVibe,   
-  "CUSTOM_CODE": WoodVibe,    
+  // --- KATALOG LAIN (Lazy Load) ---
+  // "CHINESE_DYNASTY": dynamic(() => import("./ChineseDynasty")),
+  // "ELEGANT_WHITE": dynamic(() => import("./ElegantWhite")),
 };
 
-// Fungsi Helper untuk mengambil komponen yang aman
-export function getTemplate(theme: string | null | undefined) {
-  // Jika theme kosong/null, default ke RUSTIC_A
-  if (!theme) return templateRegistry["RUSTIC_A"];
+/**
+ * Fungsi Helper untuk mengambil Component berdasarkan ID Database
+ */
+export function getTemplate(templateId: string | null | undefined): ComponentType<WeddingTemplateProps> {
+  // 1. Jika ID kosong, kembalikan Default
+  if (!templateId) return WoodVibe;
 
-  const Component = templateRegistry[theme];
+  // 2. Cari di registry
+  const Component = templateRegistry[templateId];
 
-  // Jika tema yang diminta tidak ada di daftar registry, return default (WoodVibe)
-  return Component || templateRegistry["RUSTIC_A"];
+  // 3. Jika tidak ketemu (misal typo di DB), kembalikan Default sebagai fallback
+  return Component || WoodVibe; 
 }
