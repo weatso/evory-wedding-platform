@@ -1,18 +1,18 @@
-// app/invitation/[slug]/page.tsx
-
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma"; // Pastikan path ini benar menuju prisma client instance Anda
+import { prisma } from "@/lib/prisma"; 
 import { getTemplate } from "@/components/templates/registry";
 import { WeddingTemplateProps } from "@/types/template";
 
+// UPDATE 1: params dan searchParams sekarang harus bertipe Promise
 interface PageProps {
-  params: { slug: string };
-  searchParams: { u?: string }; // u = guestCode (Unique Guest Token)
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ u?: string }>; 
 }
 
 export default async function InvitationPage({ params, searchParams }: PageProps) {
-  const { slug } = params;
-  const guestCode = searchParams.u; // Ambil kode tamu dari URL
+  // UPDATE 2: Harus di-await terlebih dahulu sebelum di-destructure
+  const { slug } = await params;
+  const { u: guestCode } = await searchParams; // Ambil kode tamu dari URL
 
   // ---------------------------------------------------------
   // 1. AMBIL DATA INVITATION (Beserta Wishes & Config)
@@ -22,13 +22,13 @@ export default async function InvitationPage({ params, searchParams }: PageProps
     include: { 
       wishes: {
         orderBy: { createdAt: 'desc' },
-        include: { guest: { select: { name: true } } } // Ambil nama pengirim ucapan
+        include: { guest: { select: { name: true } } } 
       } 
     }
   });
 
   if (!invitation) {
-    return notFound(); // Tampilkan 404 jika slug salah
+    return notFound(); 
   }
 
   // ---------------------------------------------------------
@@ -40,7 +40,6 @@ export default async function InvitationPage({ params, searchParams }: PageProps
     guest = await prisma.guest.findUnique({
       where: { 
         guestCode: guestCode,
-        // Validasi ganda: Pastikan tamu ini benar milik undangan ini
         invitationId: invitation.id 
       }
     });
@@ -50,13 +49,9 @@ export default async function InvitationPage({ params, searchParams }: PageProps
   // 3. PILIH TEMPLATE & SIAPKAN PROPS
   // ---------------------------------------------------------
   
-  // Ambil komponen berdasarkan kolom templateId di DB
   const TemplateComponent = getTemplate(invitation.templateId);
-
-  // Casting Config JSON ke Object (Safety check)
   const themeConfig = (invitation.themeConfig as Record<string, any>) || {};
 
-  // Susun data sesuai Kontrak (WeddingTemplateProps)
   const templateProps: WeddingTemplateProps = {
     invitation: {
       groomName: invitation.groomName,
@@ -67,16 +62,22 @@ export default async function InvitationPage({ params, searchParams }: PageProps
       eventTime: invitation.eventTime,
       location: invitation.location,
       mapUrl: invitation.mapUrl || "",
-      wishes: invitation.wishes, // Error 'wishes' hilang sekarang
+      wishes: invitation.wishes, 
     },
     guest: guest ? {
-      id: guest.id, // Error 'id' hilang sekarang
+      id: guest.id, 
       name: guest.name,
       category: guest.category,
-      guestCode: guest.guestCode, // Konsisten pakai guestCode
+      guestCode: guest.guestCode, 
       rsvpStatus: guest.rsvpStatus,
       paxAllocated: guest.totalPaxAllocated,
-      actualPax: guest.pax,
+      
+      // Update logic PAX:
+      // actualPax di UI = jumlah yang diinput saat RSVP
+      actualPax: guest.pax, 
+      
+      // TAMBAHAN PENTING:
+      isCheckedIn: guest.isCheckedIn, // Kirim status check-in asli dari DB
     } : null,
     config: {
       primaryColor: themeConfig.primaryColor,

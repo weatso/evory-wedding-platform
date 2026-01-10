@@ -5,14 +5,14 @@ import Image from "next/image";
 import QRCode from "react-qr-code"; 
 import { Play, Pause, MapPin, Calendar, Clock, Check, Copy, Ticket } from "lucide-react";
 
-// Imports internal (sesuaikan dengan struktur project Anda)
+// Imports internal
 import { submitRsvp } from "@/app/invitation/actions";
-import { useCountdown, useAudio } from "@/hooks/use-wedding"; 
+import { useCountdown } from "@/hooks/use-wedding"; 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { WeddingTemplateProps } from "@/types/template";
-
+import { useAudio } from "@/hooks/useAudio";
 
 export default function WoodVibe({ invitation, guest, config }: WeddingTemplateProps) {
     
@@ -30,30 +30,37 @@ export default function WoodVibe({ invitation, guest, config }: WeddingTemplateP
     }, [invitation.eventDate, invitation.eventTime]);
 
     const { days, hours, minutes, seconds } = useCountdown(targetDateStr);
-    const audio = useAudio("/music/acoustic.mp3"); 
+    
+    // FIX 1: Gunakan Destructuring Array [isPlaying, toggle]
+    // Path musik disesuaikan ke /music/daylight.mp3 dengan volume 0.15
+    const [isPlaying, toggle] = useAudio("/music/daylight.mp3", 0.15);
+    
     const [isOpen, setIsOpen] = useState(false);
 
     const handleOpen = () => {
         setIsOpen(true);
-        audio.play(); 
+        // Nyalakan musik saat buka undangan (jika belum nyala)
+        if (!isPlaying) {
+            toggle();
+        } 
     };
 
     return (
         <div className="min-h-screen bg-[#FDFBF7] text-stone-800 font-serif relative overflow-hidden scroll-smooth">
             
-            {/* TOMBOL MUSIK */}
+            {/* TOMBOL MUSIK FLOATING */}
             {isOpen && (
                 <button 
-                    onClick={audio.toggle}
-                    className="fixed bottom-6 right-6 z-50 bg-amber-800 text-white p-3 rounded-full shadow-lg hover:bg-amber-900 border-2 border-white/20 transition-all hover:scale-110"
+                    onClick={toggle}
+                    className="fixed bottom-6 right-6 z-50 bg-amber-800 text-white p-3 rounded-full shadow-lg hover:bg-amber-900 border-2 border-white/20 transition-all hover:scale-110 flex items-center justify-center"
                 >
-                    {audio.isPlaying ? <Pause className="w-5 h-5 animate-pulse" /> : <Play className="w-5 h-5 ml-1" />}
+                    {isPlaying ? <Pause className="w-5 h-5 animate-pulse" /> : <Play className="w-5 h-5 ml-1" />}
                 </button>
             )}
 
-            {/* COVER DEPAN */}
+            {/* COVER DEPAN (FULL SCREEN) */}
             {!isOpen && (
-                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-stone-900 text-white">
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-stone-900 text-white transition-opacity duration-700">
                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1605116790967-a5eb1035987a?q=80&w=1000')] bg-cover bg-center opacity-50" />
                     
                     <div className="relative z-10 text-center space-y-8 animate-in zoom-in duration-700 px-4">
@@ -220,12 +227,13 @@ function TicketSection({ guest }: { guest: any }) {
                     </div>
                     
                     {/* Status Check-in */}
-                    {guest.actualPax > 0 && (
+                    {guest.isCheckedIn && (
                         <div className="absolute inset-0 bg-green-900/90 backdrop-blur-sm flex flex-col items-center justify-center text-white z-20">
                             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-2 shadow-lg">
                                 <Check className="w-8 h-8" />
                             </div>
                             <h4 className="text-2xl font-bold">Sudah Check-in</h4>
+                            {/* actualPax di sini adalah jumlah orang yang masuk */}
                             <p className="text-sm opacity-80">{guest.actualPax} Orang Masuk</p>
                         </div>
                     )}

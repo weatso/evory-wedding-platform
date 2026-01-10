@@ -9,7 +9,6 @@ export interface WeddingTemplateProps {
     eventTime: string;
     location: string;
     mapUrl?: string;
-    // Tambahan yang error sebelumnya:
     wishes?: {
       id: string;
       message: string;
@@ -18,15 +17,16 @@ export interface WeddingTemplateProps {
     }[]; 
   };
   
-  // Data Tamu (Opsional, karena bisa null)
+  // Data Tamu
   guest?: {
-    id: string;         // Tambahan
+    id: string;
     name: string;
     category?: string | null;
-    guestCode: string;  // Ubah 'qrCode' jadi 'guestCode' agar konsisten dgn DB
+    guestCode: string;
     rsvpStatus: 'PENDING' | 'ATTENDING' | 'DECLINED';
-    paxAllocated?: number; // Tambahan logic
-    actualPax?: number;    // Tambahan logic
+    paxAllocated?: number; 
+    actualPax?: number;    
+    isCheckedIn?: boolean; // <--- TAMBAHKAN INI (Wajib ada tanda tanya ?)
   } | null;
 
   // Config Visual
