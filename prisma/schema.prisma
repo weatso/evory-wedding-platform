@@ -43,9 +43,11 @@ model Invitation {
   slug          String   @unique // URL unik, cth: evory.id/romeo-juliet
   
   // --- KONFIGURASI TAMPILAN (Logic Template) ---
-  templateId    String   @default("RUSTIC_A") // ID untuk memilih file template di Registry
-  themeConfig   Json?    // JSON object untuk simpan warna, font, aset custom per user
+  templateId    String   @default("minimalist-01") // Gunakan slug template
+  themeConfig   Json?    // Struktur: { "sections": ["hero", "event"], "colors": {...} }
   isActive      Boolean  @default(true)
+
+  @@index([slug])
   
   // --- DATA MEMPELAI ---
   groomName     String
@@ -73,6 +75,7 @@ model Invitation {
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  
 }
 
 // --------------------------------------

@@ -1,40 +1,54 @@
 @import "tailwindcss";
 
 @theme {
-  --color-evory-base: #F9F8F4;      
-  --color-evory-dark: #1A1A1A;      
-  --color-evory-card: #252525;      
+  /* Gunakan naming convention yang standar atau tetap dengan prefix evory */
+  --color-evory-base: #F9F8F4;
+  --color-evory-dark: #1A1A1A;
+  --color-evory-card: #252525;
   --color-evory-grey: #8A8A8A;
-  --color-evory-gold: #D4AF37;      
-  --color-evory-gold-dim: #8A7020;  
-  
+  --color-evory-gold: #D4AF37;
+  --color-evory-gold-dim: #8A7020;
+
   --font-serif: var(--font-serif);
   --font-sans: var(--font-sans);
-  
+
   /* Animasi Custom */
   --animate-float: float 6s ease-in-out infinite;
 }
 
 @layer base {
-  html.lenis, html.lenis body {
+
+  /* Optimasi Lenis Scroll */
+  html.lenis,
+  html.lenis body {
     height: auto;
   }
+
+  /* Reset Global dengan Variabel CSS */
+  body {
+    background-color: var(--color-evory-base);
+    color: var(--color-evory-dark);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Selection styling */
+  ::selection {
+    background-color: var(--color-evory-gold);
+    color: white;
+  }
+
+  html {
+    scroll-behavior: initial;
+    /* Biarkan Lenis yang mengatur */
+  }
+
+  /* Sembunyikan scrollbar default agar tidak double dengan Lenis jika Anda pakai custom scrollbar */
   .lenis.lenis-smooth {
     scroll-behavior: auto !important;
   }
-  .lenis.lenis-smooth [data-lenis-prevent] {
-    overscroll-behavior: contain;
-  }
-  .lenis.lenis-stopped {
-    overflow: hidden;
-  }
-  .lenis.lenis-scrolling iframe {
-    pointer-events: none;
-  }
-  
-  body {
-    @apply bg-evory-base text-evory-dark font-sans antialiased selection:bg-evory-gold selection:text-white;
-  }
+
 }
 
 @layer utilities {
@@ -44,14 +58,22 @@
     background-clip: text;
     color: transparent;
   }
-  
+
   .bg-gold-gradient {
     background: linear-gradient(135deg, #B88A44 0%, #D4AF37 100%);
   }
 
   @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-    100% { transform: translateY(0px); }
+    0% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-20px);
+    }
+
+    100% {
+      transform: translateY(0px);
+    }
   }
 }
