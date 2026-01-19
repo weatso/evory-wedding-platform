@@ -7,10 +7,10 @@ import { Play, Pause, MapPin, Calendar, Clock, Check, Copy, Ticket } from "lucid
 
 // Imports internal
 import { submitRsvp } from "@/app/invitation/actions";
-import { useCountdown } from "@/hooks/use-wedding"; 
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
+import { useCountdown } from "@/hooks/use-wedding";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
 import { WeddingTemplateProps } from "@/types/template";
 import { useAudio } from "@/hooks/useAudio";
 
@@ -19,7 +19,7 @@ export default function WoodVibe({ invitation, guest, config }: WeddingTemplateP
     // 1. LOGIKA COUNTDOWN (Parsing Jam Event)
     const targetDateStr = useMemo(() => {
         const dateObj = new Date(invitation.eventDate);
-        const dateIso = dateObj.toISOString().split('T')[0]; 
+        const dateIso = dateObj.toISOString().split('T')[0];
         // Cari pola jam (angka:angka) di dalam teks eventTime
         const timeMatch = invitation.eventTime?.match(/(\d{1,2})[:.](\d{2})/);
         if (timeMatch) {
