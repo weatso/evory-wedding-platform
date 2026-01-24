@@ -1,39 +1,47 @@
+// types/template.ts
+
 export interface WeddingTemplateProps {
-  // Data Core (Wajib ada)
   invitation: {
+    id?: string;
+    slug?: string;
     groomName: string;
     groomNick: string;
+    // --- TAMBAHKAN BAGIAN INI ---
+    groomFather?: string | null;
+    groomMother?: string | null;
+    
     brideName: string;
     brideNick: string;
+    // --- TAMBAHKAN BAGIAN INI ---
+    brideFather?: string | null;
+    brideMother?: string | null;
+
     eventDate: Date;
     eventTime: string;
     location: string;
     mapUrl?: string;
+
+    gallery: string[];
+    
     wishes?: {
       id: string;
       message: string;
       createdAt: Date;
-      guest?: { name: string } | null;
-    }[]; 
+      guest?: {
+        name: string;
+      };
+    }[];
   };
-  
-  // Data Tamu
   guest?: {
     id: string;
     name: string;
-    category?: string | null;
+    rsvpStatus: "PENDING" | "ATTENDING" | "DECLINED";
     guestCode: string;
-    rsvpStatus: 'PENDING' | 'ATTENDING' | 'DECLINED';
-    paxAllocated?: number; 
-    actualPax?: number;    
-    isCheckedIn?: boolean; // <--- TAMBAHKAN INI (Wajib ada tanda tanya ?)
+    paxAllocated?: number;
   } | null;
-
-  // Config Visual
   config: {
-    primaryColor?: string;
-    accentColor?: string;
     fontFamily?: string;
-    customAssets?: Record<string, string>;
+    primaryColor?: string;
+    customAssets?: any;
   };
 }

@@ -5,16 +5,18 @@ import dynamic from "next/dynamic";
 // 1. Kategori & Metadata Template
 export const TEMPLATES = [
   { 
-    id: "MIN_01", 
-    name: "Pure Serenity", 
-    category: "Minimalist", 
-    path: "minimalist/min-01" 
+    id: "JVN_01", 
+    name: "Javanese Royal", 
+    category: "Javanese", 
+    path: "javanese/jvn-01",
+    isPrivate: false // Default
   },
   { 
-    id: "RUSTIC_01", 
-    name: "Wood Vibe", 
-    category: "Rustic", 
-    path: "rustic/rustic-01" 
+    id: "SULTAN_ANDARA_01", 
+    name: "Exclusive for Raffi & Nagita", 
+    category: "Custom", 
+    path: "custom/sultan-01", // Folder terpisah agar rapi
+    isPrivate: true // <-- KUNCI RAHASIANYA 
   },
   // Nanti tinggal tambah di sini sampai ribuan pun tetap rapi
 ];
