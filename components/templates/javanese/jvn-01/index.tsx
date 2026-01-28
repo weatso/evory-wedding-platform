@@ -5,17 +5,14 @@ import BaseSectionWrapper from "../../base/BaseSectionWrapper";
 import { useEffect, useState } from "react";
 import localFont from 'next/font/local';
 
-// 1. KONFIGURASI FONT (WAJIB LOKAL ATAU GOOGLE FONT)
-// Opsi A: Pakai Google Font (Lebih Ringan & Cepat)
+// 1. KONFIGURASI FONT
+// [FIX] Typo 'ssrc' diperbaiki menjadi 'src'
 const fontJudul = localFont({
-  ssrc: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf',
-  variable: '--font-judul',
+  src: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf', 
+  variable: '--font-judul'
 });
 
-// Opsi B: Custom Font (LT Perfume) -> TETAP SIMPAN DI FOLDER PUBLIC
-// Anda TIDAK BOLEH menghapus file font dari folder public laptop Anda.
 const fontIsi = localFont({
-  // Path ini harus mengarah ke file di laptop Anda, BUKAN URL Supabase
   src: '../../../../public/templates/javanese/jvn-01/fonts/lt_perfume/LTPerfume-2.ttf',
   variable: '--font-isi'
 });
@@ -80,10 +77,12 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
 
       {/* LAYER 1: KONTEN UNDANGAN (KERTAS)
          - Mobile: w-full (Lebar Penuh).
-         - Desktop: w-[60%] (2/3 Layar) dan ml-auto (Rata Kanan).
+         - Desktop: 
+            * w-[550px]: Lebar kertas fix 550px (Lebih lebar dari sebelumnya 500px).
+            * ml-auto: Mendorong kertas mentok ke KANAN.
       */}
       <div 
-        className="relative z-10 w-full lg:w-[60%] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500 ease-in-out"
+        className="relative z-10 w-full lg:w-[400px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500 ease-in-out"
         // FUSION STYLE: Warna Kertas & Pattern diaplikasikan di kolom ini
         style={{ 
             backgroundColor: PALETTE.background, 
@@ -95,8 +94,10 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
         }} 
       >
 
-        {/* CONTAINER TENGAH (Max 500px agar konten rapi seperti di HP) */}
-        <div className="mx-auto max-w-[500px]"> 
+        {/* CONTAINER TENGAH 
+            - max-w-[550px] agar konten mengikuti lebar kolom kertas baru
+        */}
+        <div className="mx-auto max-w-[550px]"> 
         
            {/* =================================================================
               SECTION 1: COVER (FULL ASSET INTEGRATION)
