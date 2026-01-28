@@ -11,6 +11,11 @@ export const MOCK_WEDDING_DATA: WeddingTemplateProps = {
     
     brideName: "Juliet Capulet",
     brideNick: "Juliet",
+
+    groomImage: "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.5151844279236296.jpg", 
+    brideImage: "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.3662948404406101.jpg",
+
+
     // Isi data dummy orang tua
     brideFather: "Lord Capulet",
     brideMother: "Lady Capulet",
@@ -21,9 +26,14 @@ export const MOCK_WEDDING_DATA: WeddingTemplateProps = {
     mapUrl: "https://maps.google.com",
 
     gallery: [
-      "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=400", // Foto 1
-      "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=400", // Foto 2
-      "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=400"  // Foto 3
+      // Foto 1 (Potrait Kiri)
+      "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.8857105156388982.jpg", 
+      
+      // Foto 2 (Potrait Kanan)
+      "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.8857105156388982.jpg", 
+      
+      // Foto 3 (Landscape Bawah)
+      "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.8857105156388982.jpg"
     ],
 
     wishes: [

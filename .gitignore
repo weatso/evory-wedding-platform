@@ -52,3 +52,5 @@ next-env.d.ts
 # prisma
 /prisma/sqlite
 /lib/generated/prisma
+
+template_invitation

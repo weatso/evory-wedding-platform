@@ -44,7 +44,6 @@ model Invitation {
   
   // --- KONFIGURASI TAMPILAN (Logic Template) ---
   templateId    String   @default("minimalist-01") // Gunakan slug template
-  themeConfig   Json?    // Struktur: { "sections": ["hero", "event"], "colors": {...} }
   isActive      Boolean  @default(true)
 
   @@index([slug])
@@ -72,6 +71,19 @@ model Invitation {
 
   guests        Guest[]
   wishes        Wish[]
+
+  // --- FIELD BARU UNTUK ASET DINAMIS ---
+  // Aset ini diisi URL dari Supabase (bukan file fisik)
+  coverImageUrl   String?  @default("https://.../default-cover.svg") 
+  wingImageUrl    String?  @default("https://.../default-wing.svg")
+  musicUrl        String?
+  
+  // Konfigurasi Spesifik Template (JSON)
+  // Di sini kita simpan warna, font, atau pilihan aset wayang
+  themeConfig     Json?    
+  // Contoh isi Json: { "primaryColor": "#818362", "pattern": "batik-v1" }
+
+  gallery         String[] // Array URL Foto Gallery
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

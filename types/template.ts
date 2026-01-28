@@ -16,6 +16,9 @@ export interface WeddingTemplateProps {
     brideFather?: string | null;
     brideMother?: string | null;
 
+    groomImage?: string; // Foto Pria (Boleh kosong/undefined)
+    brideImage?: string; // Foto Wanita
+
     eventDate: Date;
     eventTime: string;
     location: string;
