@@ -10,7 +10,7 @@ const GuestSchema = z.object({
   name: z.string().min(1, "Nama tamu wajib diisi"),
   whatsapp: z.string().optional().or(z.literal("")), // Boleh kosong
   category: z.string().optional(),
-  maxPax: z.coerce.number().min(1, "Minimal 1 orang").default(1),
+  totalPaxAllocated: z.coerce.number().min(1, "Minimal 1 orang").default(1),
 });
 
 // 1. TAMBAH TAMU
@@ -22,7 +22,7 @@ export async function addGuest(invitationId: string, formData: FormData) {
     name: formData.get("name"),
     whatsapp: formData.get("whatsapp"),
     category: formData.get("category"),
-    maxPax: formData.get("maxPax"),
+    totalPaxAllocated: formData.get("totalPaxAllocated"),
   };
 
   const validated = GuestSchema.safeParse(rawData);
@@ -31,7 +31,7 @@ export async function addGuest(invitationId: string, formData: FormData) {
     return { error: "Input tidak valid. Periksa nama dan jumlah pax." };
   }
 
-  const { name, whatsapp, category, maxPax } = validated.data;
+  const { name, whatsapp, category, totalPaxAllocated } = validated.data;
 
   // GENERATE KODE UNIK (Server Side)
   // Format: 4 karakter acak (A-Z, 0-9)
@@ -44,17 +44,16 @@ export async function addGuest(invitationId: string, formData: FormData) {
         name,
         whatsapp: whatsapp || "", // Handle null
         category: category || "Regular",
-        guestCode, 
-        maxPax,
-        actualPax: 0,
+        guestCode,
+        totalPaxAllocated,
         rsvpStatus: "PENDING",
       },
     });
 
-    revalidatePath("/dashboard"); 
-    revalidatePath("/dashboard/live"); 
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/live");
     return { success: true };
-    
+
   } catch (error) {
     console.error("Gagal tambah tamu:", error);
     return { error: "Gagal menyimpan data." };
@@ -83,7 +82,7 @@ export async function deleteGuest(guestId: string) {
     }
 
     await prisma.guest.delete({ where: { id: guestId } });
-    
+
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/live");
     return { success: true };
@@ -93,36 +92,44 @@ export async function deleteGuest(guestId: string) {
 }
 
 // 3. UPDATE TAMU (BARU)
-export async function updateGuest(guestId: string, formData: FormData) {
-    const session = await auth();
-    if (!session?.user?.id) return { error: "Unauthorized" };
+// 3. UPDATE TAMU (BARU)
+// Menerima object biasa karena dipanggil via Client Component (bukan <form>)
+export async function updateGuest(guestId: string, payload: {
+  name: string;
+  whatsapp?: string | null;
+  category?: string | null;
+  totalPaxAllocated: number;
+}) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
 
-    const rawData = {
-        name: formData.get("name"),
-        whatsapp: formData.get("whatsapp"),
-        category: formData.get("category"),
-        maxPax: formData.get("maxPax"),
-    };
+  // Normalisasi input untuk Zod (ubah null jadi undefined atau empty string)
+  const rawData = {
+    name: payload.name,
+    whatsapp: payload.whatsapp ?? "",
+    category: payload.category ?? "Regular",
+    totalPaxAllocated: payload.totalPaxAllocated,
+  };
 
-    const validated = GuestSchema.safeParse(rawData);
-    if (!validated.success) return { error: "Data edit tidak valid." };
+  const validated = GuestSchema.safeParse(rawData);
+  if (!validated.success) return { error: "Data edit tidak valid." };
 
-    try {
-        // Cek Security (Opsional: bisa query dulu seperti deleteGuest)
-        
-        await prisma.guest.update({
-            where: { id: guestId },
-            data: {
-                name: validated.data.name,
-                whatsapp: validated.data.whatsapp || "",
-                category: validated.data.category,
-                maxPax: validated.data.maxPax,
-            }
-        });
+  try {
+    // Cek Security (Opsional: bisa query dulu seperti deleteGuest)
 
-        revalidatePath("/dashboard");
-        return { success: true };
-    } catch (error) {
-        return { error: "Gagal update data." };
-    }
+    await prisma.guest.update({
+      where: { id: guestId },
+      data: {
+        name: validated.data.name,
+        whatsapp: validated.data.whatsapp || "",
+        category: validated.data.category,
+        totalPaxAllocated: validated.data.totalPaxAllocated,
+      }
+    });
+
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    return { error: "Gagal update data." };
+  }
 }
