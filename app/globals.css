@@ -1,79 +1,53 @@
 @import "tailwindcss";
 
 @theme {
-  /* Gunakan naming convention yang standar atau tetap dengan prefix evory */
+  /* --- WARNA EVORY --- */
   --color-evory-base: #F9F8F4;
-  --color-evory-dark: #1A1A1A;
+  --color-evory-dark: #1A1A1A;     /* Hitam lebih pekat */
   --color-evory-card: #252525;
   --color-evory-grey: #8A8A8A;
   --color-evory-gold: #D4AF37;
-  --color-evory-gold-dim: #8A7020;
-
+  
   --font-serif: var(--font-serif);
   --font-sans: var(--font-sans);
 
-  /* Animasi Custom */
+  /* --- ANIMASI CUSTOM --- */
+  --animate-marquee: marquee 30s linear infinite;
   --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
 }
 
 @layer base {
-
-  /* Optimasi Lenis Scroll */
-  html.lenis,
-  html.lenis body {
-    height: auto;
-  }
-
-  /* Reset Global dengan Variabel CSS */
+  html.lenis, html.lenis body { height: auto; }
+  
   body {
     background-color: var(--color-evory-base);
     color: var(--color-evory-dark);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
-  /* Selection styling */
   ::selection {
     background-color: var(--color-evory-gold);
     color: white;
   }
-
-  html {
-    scroll-behavior: initial;
-    /* Biarkan Lenis yang mengatur */
-  }
-
-  /* Sembunyikan scrollbar default agar tidak double dengan Lenis jika Anda pakai custom scrollbar */
-  .lenis.lenis-smooth {
-    scroll-behavior: auto !important;
-  }
-
 }
 
 @layer utilities {
-  .text-gold-gradient {
-    background: linear-gradient(135deg, #B88A44 0%, #FFE5A0 50%, #B88A44 100%);
+  .text-gold-shine {
+    background: linear-gradient(135deg, #B88A44 0%, #E5C579 25%, #FFD700 50%, #E5C579 75%, #B88A44 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-  }
-
-  .bg-gold-gradient {
-    background: linear-gradient(135deg, #B88A44 0%, #D4AF37 100%);
-  }
-
-  @keyframes float {
-    0% {
-      transform: translateY(0px);
-    }
-
-    50% {
-      transform: translateY(-20px);
-    }
-
-    100% {
-      transform: translateY(0px);
-    }
   }
 }
