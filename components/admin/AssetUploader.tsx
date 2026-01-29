@@ -1,84 +1,111 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client"; // Pastikan path ini benar sesuai setup Anda
+import { Button } from "@/components/ui/button";
+import { Loader2, UploadCloud, X } from "lucide-react";
+import Image from "next/image";
+import { toast } from "sonner"; // Atau library toast yang Anda pakai
 
-// Inisialisasi Client Supabase (Gunakan Environment Variables!)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+interface AssetUploaderProps {
+  bucketName?: string;
+  storagePath: string; // [BARU] Folder tujuan (misal: 'users/123' atau 'system/mockups')
+  onUploadComplete: (url: string) => void;
+  defaultImage?: string;
+  label?: string;
+}
 
-export default function AssetUploader({ 
-  bucket = "wedding-assets", 
-  path = "uploads", 
-  onUploadComplete 
-}: { 
-  bucket?: string;
-  path?: string;
-  onUploadComplete: (url: string) => void; 
-}) {
+export default function AssetUploader({
+  bucketName = "wedding-assets", // Nama bucket di Supabase
+  storagePath, 
+  onUploadComplete,
+  defaultImage,
+  label = "Upload Image"
+}: AssetUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(defaultImage || null);
+  const supabase = createClient();
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-
-    const file = e.target.files[0];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${path}/${fileName}`;
-
-    setUploading(true);
-
     try {
-      // 1. Upload ke Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file);
+      setUploading(true);
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-      if (uploadError) throw uploadError;
+      // 1. Validasi File
+      if (file.size > 2 * 1024 * 1024) throw new Error("File terlalu besar (Max 2MB)");
 
-      // 2. Ambil Public URL
-      const { data } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filePath);
-
-      // 3. Kembalikan URL ke Parent Component
-      setPreview(data.publicUrl);
-      onUploadComplete(data.publicUrl);
+      // 2. Generate Nama Unik (Agar tidak menimpa file lain)
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       
-    } catch (error) {
-      alert("Gagal upload gambar!");
+      // 3. Susun Path Lengkap: storagePath/fileName
+      // Contoh: "users/user_123/invitation_abc/gallery/foto1.jpg"
+      const fullPath = `${storagePath}/${fileName}`;
+
+      // 4. Upload ke Supabase
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(fullPath, file, { upsert: true });
+
+      if (error) throw error;
+
+      // 5. Ambil Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(fullPath);
+
+      setPreview(publicUrl);
+      onUploadComplete(publicUrl);
+      toast.success("Upload berhasil!");
+
+    } catch (error: any) {
       console.error(error);
+      toast.error(error.message || "Gagal upload image");
     } finally {
       setUploading(false);
     }
   };
 
-  return (
-    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
-      {preview ? (
-        <div className="relative w-full h-40 mb-4">
-            {/* Tampilkan Preview jika Gambar */}
-            <img src={preview} className="w-full h-full object-contain rounded" alt="Preview" />
-            <p className="text-xs text-green-600 mt-2 font-mono break-all">{preview}</p>
-        </div>
-      ) : (
-        <div className="text-gray-500 mb-2">Belum ada file</div>
-      )}
+  const handleRemove = () => {
+    setPreview(null);
+    onUploadComplete(""); // Kosongkan field di database
+  };
 
-      <label className="cursor-pointer bg-[#5D4037] text-white px-4 py-2 rounded text-sm font-bold shadow hover:bg-[#4E342E] inline-block">
-        {uploading ? "Mengupload..." : "Pilih File"}
-        <input 
-          type="file" 
-          accept="image/*,audio/*" // Terima Gambar & Audio
-          className="hidden" 
-          onChange={handleUpload}
-          disabled={uploading}
-        />
-      </label>
-      <p className="text-[10px] text-gray-400 mt-2">Max 5MB. JPG, PNG, MP3.</p>
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{label}</label>
+      
+      <div className="border-2 border-dashed border-gray-700/50 rounded-lg p-4 hover:bg-gray-800/50 transition-colors">
+        {preview ? (
+          <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black/20 group">
+            <Image src={preview} alt="Preview" fill className="object-cover" />
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+               <Button variant="destructive" size="sm" onClick={handleRemove} type="button">
+                 <X size={16} className="mr-2" /> Hapus
+               </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+             <UploadCloud size={32} className="mb-2 opacity-50" />
+             <p className="text-xs mb-4">JPG, PNG (Max 2MB)</p>
+             <div className="relative">
+                <Button disabled={uploading} variant="secondary" size="sm" type="button">
+                  {uploading ? <Loader2 className="animate-spin mr-2" size={16}/> : null}
+                  Pilih File
+                </Button>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                />
+             </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

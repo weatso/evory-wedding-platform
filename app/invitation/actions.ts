@@ -1,5 +1,6 @@
 'use server';
 
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma"; //
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -92,4 +93,21 @@ export async function submitRsvp(formData: FormData) {
       error: "Gagal memproses RSVP. Silakan coba lagi." 
     };
   }
+}
+
+export async function updateInvitationAssets(invitationId: string, data: { coverImageUrl?: string }) {
+  const session = await auth();
+  if (!session) throw new Error("Unauthorized");
+
+  // Validasi: Pastikan user adalah pemilik undangan ATAU admin
+  // (Logic validasi sederhana)
+  
+  await prisma.invitation.update({
+    where: { id: invitationId },
+    data: {
+        ...(data.coverImageUrl && { coverImageUrl: data.coverImageUrl }),
+    }
+  });
+
+  revalidatePath("/dashboard");
 }

@@ -2,6 +2,7 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import GuestForm from "./GuestForm";
+import ClientAssetsForm from "./ClientAssetsForm"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ export default async function DashboardPage(props: Props) {
   const userRole = session.user.role;
 
   // =========================================================
-  // 3. SISTEM ANTI-NYASAR (DIPERBAIKI)
+  // 3. SISTEM ANTI-NYASAR
   // =========================================================
   
   if (userRole === "ADMIN") {
@@ -78,13 +79,18 @@ export default async function DashboardPage(props: Props) {
     );
   }
 
-  // 7. Hitung Statistik
+  // 7. Hitung Statistik (MENGGUNAKAN VARIABLE BARU: totalPaxAllocated)
   const totalGuests = invitation.guests.length;
-  const totalPax = invitation.guests.reduce((sum, guest) => sum + guest.maxPax, 0);
+  
+  // [FIX] Menggunakan 'totalPaxAllocated' sesuai Schema Prisma Baru
+  const totalPax = invitation.guests.reduce((sum, guest) => sum + guest.totalPaxAllocated, 0);
+  
   const confirmedGuests = invitation.guests.filter(g => g.rsvpStatus === "ATTENDING").length;
+  
+  // [FIX] Menggunakan 'totalPaxAllocated'
   const confirmedPax = invitation.guests
     .filter(g => g.rsvpStatus === "ATTENDING")
-    .reduce((sum, g) => sum + g.maxPax, 0);
+    .reduce((sum, g) => sum + g.totalPaxAllocated, 0);
 
   // Jika Admin sedang mengintip, tampilkan Banner Peringatan
   const isAdminViewing = userRole === "ADMIN" && viewAsId;
@@ -170,13 +176,24 @@ export default async function DashboardPage(props: Props) {
             {/* AREA UTAMA: FORM & TABEL */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 
-                {/* KOLOM KIRI: FORM TAMBAH TAMU */}
-                <div className="lg:col-span-1 lg:sticky lg:top-8">
+                {/* KOLOM KIRI: FORM TAMBAH TAMU & ASET */}
+                <div className="lg:col-span-1 lg:sticky lg:top-8 space-y-6">
+                    
+                    {/* 1. UPLOAD ASET CLIENT */}
+                    <ClientAssetsForm 
+                        invitationId={invitation.id}
+                        userId={targetUserId}
+                        initialCover={invitation.coverImageUrl}
+                        initialGallery={invitation.gallery}
+                    />
+
+                    {/* 2. FORM TAMBAH TAMU */}
                     <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-1 rounded-xl shadow-xl">
                         <div className="bg-slate-50 text-slate-900 rounded-lg">
                              <GuestForm invitationId={invitation.id} />
                         </div>
                     </div>
+
                     {/* Tips hanya muncul buat pemilik asli, admin ga perlu */}
                     {!isAdminViewing && (
                         <div className="mt-4 p-4 bg-blue-50 text-blue-800 rounded-lg text-xs border border-blue-100">
@@ -196,19 +213,19 @@ export default async function DashboardPage(props: Props) {
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
-    <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
-        <tr>
-            <th className="px-6 py-4">Nama Tamu</th>
-            <th className="px-6 py-4">Kategori</th>
-            <th className="px-6 py-4">Status RSVP</th>
-            <th className="px-6 py-4 text-center">Jatah Kursi</th>
-            <th className="px-6 py-4 text-right">Aksi</th> {/* TAMBAHAN KOLOM AKSI */}
-        </tr>
-    </thead>
+                                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
+                                        <tr>
+                                            <th className="px-6 py-4">Nama Tamu</th>
+                                            <th className="px-6 py-4">Kategori</th>
+                                            <th className="px-6 py-4">Status RSVP</th>
+                                            <th className="px-6 py-4 text-center">Jatah Kursi</th>
+                                            <th className="px-6 py-4 text-right">Aksi</th>
+                                        </tr>
+                                    </thead>
                                     <tbody className="divide-y divide-slate-100 bg-white">
                                         {invitation.guests.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="p-12 text-center text-slate-400 flex flex-col items-center">
+                                                <td colSpan={5} className="p-12 text-center text-slate-400 flex flex-col items-center">
                                                     <Users className="w-10 h-10 mb-3 opacity-20" />
                                                     <p>Belum ada tamu yang ditambahkan.</p>
                                                 </td>
@@ -219,12 +236,13 @@ export default async function DashboardPage(props: Props) {
                                                     <div className="font-bold text-slate-800">{g.name}</div>
                                                     <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
                                                         <span className="bg-slate-100 px-1 rounded">#{g.guestCode}</span>
-                                                        <span className="hidden group-hover:inline text-slate-300">• {g.whatsapp}</span>
+                                                        {/* [FIX] Handle jika whatsapp null */}
+                                                        <span className="hidden group-hover:inline text-slate-300">• {g.whatsapp || "-"}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2 py-1 rounded text-[10px] font-bold border ${g.category === 'VIP' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                                                        {g.category}
+                                                        {g.category || "Umum"}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -245,11 +263,12 @@ export default async function DashboardPage(props: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-center font-mono text-slate-600">
-                                                    {g.maxPax}
+                                                    {/* [FIX] Menampilkan totalPaxAllocated */}
+                                                    {g.totalPaxAllocated}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                    <GuestRowActions guest={g} />
-                </td>
+                                                    <GuestRowActions guest={g} />
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

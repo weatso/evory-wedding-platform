@@ -1,130 +1,203 @@
-'use client';
+"use client";
 
 import { useState } from "react";
-import { deleteGuest, updateGuest } from "./actions"; // Import actions yang baru kita buat
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Pencil, Trash2, Loader2, Save } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Copy } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+    deleteGuest, 
+    updateGuest 
+} from "./actions"; 
+import { toast } from "sonner";
 
-// Tipe data yang diterima dari Prisma
-type GuestData = {
-    id: string;
-    name: string;
-    category: string | null;
-    maxPax: number;
-    whatsapp: string | null;
-};
+// [FIX] Interface disesuaikan dengan Database Baru
+export interface GuestData {
+  id: string;
+  name: string;
+  guestCode: string;
+  category: string | null;
+  rsvpStatus: string; 
+  totalPaxAllocated: number; // SUDAH DIGANTI dari maxPax
+  whatsapp: string | null;   // SUDAH DITAMBAHKAN
+}
 
 export default function GuestRowActions({ guest }: { guest: GuestData }) {
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-    // --- LOGIKA HAPUS ---
-    async function handleDelete() {
-        if (!confirm(`Yakin ingin menghapus tamu "${guest.name}" selamanya?`)) return;
-        
-        setIsLoading(true);
-        const res = await deleteGuest(guest.id);
-        setIsLoading(false);
+  // State Form Edit
+  const [formData, setFormData] = useState({
+    name: guest.name,
+    whatsapp: guest.whatsapp || "",
+    category: guest.category || "",
+    totalPaxAllocated: guest.totalPaxAllocated // Mapping ke variable baru
+  });
 
-        if (res?.error) alert(res.error);
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await deleteGuest(guest.id);
+      toast.success("Tamu berhasil dihapus");
+      setOpenDelete(false);
+    } catch (error) {
+      toast.error("Gagal menghapus tamu");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // --- LOGIKA EDIT (UPDATE) ---
-    async function handleUpdate(formData: FormData) {
-        setIsLoading(true);
-        const res = await updateGuest(guest.id, formData);
-        setIsLoading(false);
-        
-        if (res?.error) {
-            alert(res.error);
-        } else {
-            setIsEditOpen(false); // Tutup modal jika sukses
-        }
+  const handleUpdate = async () => {
+    setLoading(true);
+    try {
+      await updateGuest(guest.id, {
+          name: formData.name,
+          whatsapp: formData.whatsapp || null,
+          category: formData.category || null,
+          totalPaxAllocated: Number(formData.totalPaxAllocated) // Pastikan dikirim sebagai number
+      });
+      toast.success("Data tamu diperbarui");
+      setOpenEdit(false);
+    } catch (error) {
+      toast.error("Gagal update data");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return (
-        <div className="flex justify-end gap-2">
-            {/* 1. TOMBOL EDIT */}
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                onClick={() => setIsEditOpen(true)}
-                title="Edit Tamu"
-            >
-                <Pencil className="w-4 h-4" />
+  const copyInvitationLink = () => {
+    // Sesuaikan domain dengan environment (localhost atau production)
+    const baseUrl = window.location.origin; 
+    const link = `${baseUrl}/invitation/${guest.guestCode}`; 
+    navigator.clipboard.writeText(link);
+    toast.success("Link undangan disalin!");
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100">
+            <span className="sr-only">Open menu</span>
+            <MoreHorizontal className="h-4 w-4 text-slate-500" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuLabel>Aksi Tamu</DropdownMenuLabel>
+          <DropdownMenuItem onClick={copyInvitationLink} className="cursor-pointer">
+            <Copy className="mr-2 h-4 w-4 text-blue-500" /> Salin Link
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setOpenEdit(true)} className="cursor-pointer">
+            <Pencil className="mr-2 h-4 w-4 text-amber-500" /> Edit Data
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setOpenDelete(true)} className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50">
+            <Trash2 className="mr-2 h-4 w-4" /> Hapus
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* --- MODAL EDIT --- */}
+      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Data Tamu</DialogTitle>
+            <DialogDescription>
+              Perbarui informasi tamu di sini. Klik simpan setelah selesai.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right text-xs uppercase font-bold text-slate-500">
+                Nama
+              </Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="whatsapp" className="text-right text-xs uppercase font-bold text-slate-500">
+                WhatsApp
+              </Label>
+              <Input
+                id="whatsapp"
+                value={formData.whatsapp}
+                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                className="col-span-3"
+                placeholder="0812..."
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category" className="text-right text-xs uppercase font-bold text-slate-500">
+                Kategori
+              </Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="pax" className="text-right text-xs uppercase font-bold text-slate-500">
+                Kursi
+              </Label>
+              <Input
+                id="pax"
+                type="number"
+                min={1}
+                value={formData.totalPaxAllocated}
+                onChange={(e) => setFormData({ ...formData, totalPaxAllocated: parseInt(e.target.value) || 1 })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenEdit(false)}>Batal</Button>
+            <Button onClick={handleUpdate} disabled={loading} className="bg-slate-900 text-white">
+                {loading ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            {/* 2. TOMBOL HAPUS */}
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                onClick={handleDelete}
-                disabled={isLoading}
-                title="Hapus Tamu"
-            >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4" />}
+      {/* --- MODAL DELETE --- */}
+      <Dialog open={openDelete} onOpenChange={setOpenDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Tamu?</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus <b>{guest.name}</b>? Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDelete(false)}>Batal</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={loading}>
+                {loading ? "Menghapus..." : "Ya, Hapus"}
             </Button>
-
-            {/* 3. MODAL EDIT (POPUP) */}
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Edit Data Tamu</DialogTitle>
-                    </DialogHeader>
-                    
-                    <form action={handleUpdate} className="grid gap-4 py-4">
-                        {/* Nama */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Nama Tamu</Label>
-                            <Input id="name" name="name" defaultValue={guest.name} required />
-                        </div>
-
-                        {/* Kategori & Pax */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="category">Kategori</Label>
-                                <select 
-                                    name="category" 
-                                    id="category" 
-                                    defaultValue={guest.category || "Regular"}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                >
-                                    <option value="Regular">Regular</option>
-                                    <option value="VIP">VIP</option>
-                                    <option value="Keluarga">Keluarga</option>
-                                </select>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="maxPax">Jatah Kursi (Pax)</Label>
-                                <Input id="maxPax" name="maxPax" type="number" min="1" defaultValue={guest.maxPax} required />
-                            </div>
-                        </div>
-
-                        {/* WhatsApp */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="whatsapp">Nomor WhatsApp</Label>
-                            <Input id="whatsapp" name="whatsapp" type="tel" placeholder="Contoh: 62812345678" defaultValue={guest.whatsapp || ""} />
-                        </div>
-
-                        <DialogFooter>
-                            <Button type="submit" disabled={isLoading} className="bg-slate-900 text-white hover:bg-slate-800">
-                                {isLoading ? "Menyimpan..." : <><Save className="w-4 h-4 mr-2"/> Simpan Perubahan</>}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-        </div>
-    );
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }

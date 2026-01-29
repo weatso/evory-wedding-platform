@@ -1,12 +1,21 @@
 import type { NextAuthConfig } from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import bcrypt from "bcryptjs";
+import { UserRole } from "@prisma/client";
+
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 
 export const authConfig = {
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   callbacks: {
-    // 1. LOGIKA MIDDLEWARE (SATPOL PP)
-    // Menentukan siapa boleh masuk ke mana sebelum halaman dirender
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const userRole = auth?.user?.role;
@@ -16,35 +25,21 @@ export const authConfig = {
       const isOnUsher = nextUrl.pathname.startsWith("/usher");
       const isOnLogin = nextUrl.pathname.startsWith("/login");
 
-      // A. PROTEKSI WILAYAH ADMIN
       if (isOnAdmin) {
-        if (!isLoggedIn) return false; 
-        
-        // Kembalikan ke aturan ketat: Hanya Admin boleh masuk /admin
-        if (userRole !== "ADMIN") {
-            return Response.redirect(new URL("/dashboard", nextUrl));
-        }
+        if (!isLoggedIn || userRole !== "ADMIN") return false;
         return true;
       }
 
-      // B. PROTEKSI WILAYAH USHER
       if (isOnUsher) {
-        if (!isLoggedIn) return false;
-        
-        // Admin juga boleh intip dashboard usher buat monitoring
-        if (userRole !== "USHER" && userRole !== "ADMIN") {
-             return Response.redirect(new URL("/dashboard", nextUrl));
-        }
+        if (!isLoggedIn || (userRole !== "USHER" && userRole !== "ADMIN")) return false;
         return true;
       }
 
-      // C. PROTEKSI WILAYAH DASHBOARD (CLIENT)
       if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirect ke login jika belum auth
+        if (!isLoggedIn) return false;
+        return true;
       }
 
-      // D. JIKA SUDAH LOGIN TAPI BUKA HALAMAN LOGIN
       if (isOnLogin && isLoggedIn) {
           if (userRole === "ADMIN") return Response.redirect(new URL("/admin", nextUrl));
           if (userRole === "USHER") return Response.redirect(new URL("/usher", nextUrl));
@@ -54,27 +49,39 @@ export const authConfig = {
       return true;
     },
 
-    // 2. LOGIKA TOKEN (Menyimpan Role ke dalam Token)
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
-        // @ts-ignore
-        token.role = user.role;
-        // @ts-ignore
+        token.role = user.role; 
         token.id = user.id;
       }
       return token;
     },
 
-    // 3. LOGIKA SESSION (Menyalin Role dari Token ke Session agar bisa dibaca di frontend)
-    session({ session, token }) {
+    async session({ session, token }) {
+      // FIX ERROR: Tambahkan Casting 'as ...'
       if (token && session.user) {
-        // @ts-ignore
-        session.user.role = token.role;
-        // @ts-ignore
-        session.user.id = token.id;
+        session.user.id = token.id as string;
+        session.user.role = token.role as UserRole;
       }
       return session;
     },
   },
-  providers: [], // Providers didefinisikan di auth.ts
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        const validatedFields = LoginSchema.safeParse(credentials);
+
+        if (validatedFields.success) {
+          const { email, password } = validatedFields.data;
+          
+          const user = await prisma.user.findUnique({ where: { email } });
+          if (!user || !user.password) return null;
+
+          const passwordsMatch = await bcrypt.compare(password, user.password);
+          if (passwordsMatch) return user;
+        }
+        return null;
+      },
+    }),
+  ],
 } satisfies NextAuthConfig;
