@@ -87,11 +87,13 @@ model Invitation {
   // Data Mempelai
   groomName     String
   groomNick     String
+  groomImageUrl String?
   groomFather   String?
   groomMother   String?
   
   brideName     String
   brideNick     String
+  brideImageUrl String?
   brideFather   String?
   brideMother   String?
   
