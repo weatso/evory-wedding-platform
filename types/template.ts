@@ -1,50 +1,18 @@
 // types/template.ts
+import { Guest, Invitation, Wish } from "@prisma/client";
 
+// Definisikan Wish yang membawa data Guest (untuk nama di ucapan)
+export type WishWithGuest = Wish & {
+  guest: Guest | null;
+};
+
+// Definisikan Invitation yang membawa daftar Wish tadi
+export type InvitationWithRelations = Invitation & {
+  wishes: WishWithGuest[];
+};
+
+// Props Utama Template
 export interface WeddingTemplateProps {
-  invitation: {
-    id?: string;
-    slug?: string;
-    groomName: string;
-    groomNick: string;
-    // --- TAMBAHKAN BAGIAN INI ---
-    groomFather?: string | null;
-    groomMother?: string | null;
-    
-    brideName: string;
-    brideNick: string;
-    // --- TAMBAHKAN BAGIAN INI ---
-    brideFather?: string | null;
-    brideMother?: string | null;
-
-    groomImage?: string; // Foto Pria (Boleh kosong/undefined)
-    brideImage?: string; // Foto Wanita
-
-    eventDate: Date;
-    eventTime: string;
-    location: string;
-    mapUrl?: string;
-
-    gallery: string[];
-    
-    wishes?: {
-      id: string;
-      message: string;
-      createdAt: Date;
-      guest?: {
-        name: string;
-      };
-    }[];
-  };
-  guest?: {
-    id: string;
-    name: string;
-    rsvpStatus: "PENDING" | "ATTENDING" | "DECLINED";
-    guestCode: string;
-    paxAllocated?: number;
-  } | null;
-  config: {
-    fontFamily?: string;
-    primaryColor?: string;
-    customAssets?: any;
-  };
+  invitation: InvitationWithRelations;
+  guest: Guest | null;
 }

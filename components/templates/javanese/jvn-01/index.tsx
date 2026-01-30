@@ -1,261 +1,373 @@
 "use client";
 
 import { WeddingTemplateProps } from "@/types/template";
-import BaseSectionWrapper from "../../base/BaseSectionWrapper";
-import { useEffect, useState } from "react";
 import localFont from 'next/font/local';
+import Image from "next/image"; // Gunakan next/image untuk foto user
+import { useEffect, useState } from "react";
+import BaseSectionWrapper from "../../base/BaseSectionWrapper";
 
-// 1. KONFIGURASI FONT
-// [FIX] Typo 'ssrc' diperbaiki menjadi 'src'
+// 1. KONFIGURASI FONT (Path disesuaikan agar aman)
+// Note: Path di next/font/local relatif terhadap FILE INI
 const fontJudul = localFont({
-  src: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf', 
-  variable: '--font-judul'
+   src: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf',
+   variable: '--font-judul',
+   display: 'swap'
 });
 
 const fontIsi = localFont({
-  src: '../../../../public/templates/javanese/jvn-01/fonts/lt_perfume/LTPerfume-2.ttf',
-  variable: '--font-isi'
+   src: '../../../../public/templates/javanese/jvn-01/fonts/lt_perfume/LTPerfume-2.ttf',
+   variable: '--font-isi',
+   display: 'swap'
 });
 
+// Aset Statis (CDN/Supabase)
 const ASSETS = "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/system-asset/jvn-01";
 
-// 2. DEFINISI WARNA
-const PALETTE = {
-  primary: "#818362",
-  secondary: "#AC8E85",
-  background: "#F1F1E8", // Warna Kertas
+// Palet Warna (Bisa dipakai via className juga)
+const COLORS = {
+   primary: "#5D4037", // Coklat Tua (Teks Utama)
+   secondary: "#8D6E63", // Coklat Muda (Aksen)
+   paper: "#F1F1E8", // Background Kertas
 };
 
-// --- KOMPONEN GALLERY FRAME ---
-const GalleryFrame = ({ photoSrc, className }: { photoSrc: string, className?: string }) => (
-  <div className={`relative overflow-hidden rounded-xl shadow-md bg-gray-200 ${className}`}>
-    <img 
-      src={photoSrc} 
-      alt="Gallery" 
-      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-110" 
-    />
-  </div>
+// Komponen Pembantu: Frame Foto
+const GalleryFrame = ({ src, alt, className }: { src: string, alt: string, className?: string }) => (
+   <div className={`relative overflow-hidden rounded-xl shadow-md bg-stone-200 ${className}`}>
+      <Image
+         src={src}
+         alt={alt}
+         fill
+         className="object-cover transition-transform duration-700 hover:scale-110"
+         sizes="(max-width: 768px) 100vw, 33vw"
+      />
+   </div>
 );
 
-export default function Jvn01({ invitation }: WeddingTemplateProps) {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
+   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-  useEffect(() => {
-    const target = new Date(invitation.eventDate).getTime();
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const difference = target - now;
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((difference % (1000 * 60)) / 1000),
-        });
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [invitation.eventDate]);
+   // Countdown Logic
+   useEffect(() => {
+      const target = new Date(invitation.eventDate).getTime();
+      const interval = setInterval(() => {
+         const now = new Date().getTime();
+         const diff = target - now;
+         if (diff > 0) {
+            setTimeLeft({
+               days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+               hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+               minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+               seconds: Math.floor((diff % (1000 * 60)) / 1000),
+            });
+         }
+      }, 1000);
+      return () => clearInterval(interval);
+   }, [invitation.eventDate]);
 
-  return (
-    // WRAPPER UTAMA
-    <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative`}>
+   return (
+      <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900`}>
 
-      {/* LAYER 0: GLOBAL WING BACKGROUND (DESKTOP)
-         - Fixed: Diam di tempat saat discroll.
-         - Inset-0: Memenuhi 1 SATU LAYAR PENUH.
-         - Z-0: Paling belakang.
-      */}
-      <div 
-        className="fixed inset-0 z-0 hidden lg:block bg-gray-900"
-        style={{ 
-          backgroundImage: `url('${ASSETS}/WING/BACKGROUND 2.svg')`, 
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+         {/* --- LAYER 0: GLOBAL BACKGROUND (DESKTOP) --- */}
+         <div
+            className="fixed inset-0 z-0 hidden lg:block"
+            style={{
+               backgroundImage: `url('${ASSETS}/WING/BACKGROUND 2.svg')`,
+               backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.5
+            }}
+         />
 
-      {/* LAYER 1: KONTEN UNDANGAN (KERTAS)
-         - Mobile: w-full (Lebar Penuh).
-         - Desktop: 
-            * w-[550px]: Lebar kertas fix 550px (Lebih lebar dari sebelumnya 500px).
-            * ml-auto: Mendorong kertas mentok ke KANAN.
-      */}
-      <div 
-        className="relative z-10 w-full lg:w-[400px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500 ease-in-out"
-        // FUSION STYLE: Warna Kertas & Pattern diaplikasikan di kolom ini
-        style={{ 
-            backgroundColor: PALETTE.background, 
-            backgroundImage: `url('${ASSETS}/01-Cover/PATTERN ATAS BACKGROUND.svg')`,
-            backgroundRepeat: 'repeat-y',
-            backgroundSize: '100% auto', // Pattern menyesuaikan lebar kolom kanan
-            backgroundPosition: 'top center',
-            backgroundBlendMode: 'multiply'
-        }} 
-      >
+         {/* --- LAYER 1: KERTAS UNDANGAN (MOBILE WRAPPER) --- */}
+         <div
+            className="relative z-10 w-full lg:w-[480px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500"
+            style={{
+               backgroundColor: COLORS.paper,
+               backgroundImage: `url('${ASSETS}/01-Cover/PATTERN ATAS BACKGROUND.svg')`,
+               backgroundRepeat: 'repeat-y', backgroundSize: '100% auto', backgroundBlendMode: 'multiply'
+            }}
+         >
+            <div className="mx-auto max-w-full overflow-hidden">
 
-        {/* CONTAINER TENGAH 
-            - max-w-[550px] agar konten mengikuti lebar kolom kertas baru
-        */}
-        <div className="mx-auto max-w-[550px]"> 
-        
-           {/* =================================================================
-              SECTION 1: COVER (FULL ASSET INTEGRATION)
+               {/* =================================================================
+              1. COVER SECTION
               ================================================================= */}
-           <BaseSectionWrapper 
-              id="cover" 
-              className="min-h-screen flex flex-col items-center justify-between relative z-10 pt-10 overflow-hidden"
-           >
-              
-              {/* HIASAN SUDUT */}
-              <img src={`${ASSETS}/01-Cover/DAUN KIRI ATAS.svg`} className="absolute top-0 left-0 w-32 md:w-48 z-20 pointer-events-none" alt="" />
-              <img src={`${ASSETS}/01-Cover/DAUN KANAN ATAS.svg`} className="absolute top-0 right-0 w-32 md:w-48 z-20 pointer-events-none" alt="" />
+               <BaseSectionWrapper id="cover" className="min-h-screen flex flex-col items-center justify-between relative pt-10 px-6">
+                  {/* Dekorasi */}
+                  <img src={`${ASSETS}/01-Cover/DAUN KIRI ATAS.svg`} className="absolute top-0 left-0 w-24 md:w-32 z-20 pointer-events-none" alt="" />
+                  <img src={`${ASSETS}/01-Cover/DAUN KANAN ATAS.svg`} className="absolute top-0 right-0 w-24 md:w-32 z-20 pointer-events-none" alt="" />
 
-              {/* KONTEN TENGAH */}
-              <div className="z-30 text-center relative mt-10 space-y-2 flex flex-col items-center">
-                 <div className="space-y-1 drop-shadow-sm">
-                    <h1 className="font-judul text-4xl md:text-6xl font-bold text-[#5D4037] leading-tight">{invitation.groomNick}</h1>
-                    <div className="font-serif text-xl md:text-2xl text-[#8D6E63]">&</div>
-                    <h1 className="font-judul text-4xl md:text-6xl font-bold text-[#5D4037] leading-tight">{invitation.brideNick}</h1>
-                 </div>
-                 <div className="mt-6 px-8 py-2 border-t border-b border-[#8D6E63] inline-block bg-white/40 backdrop-blur-[1px] rounded-full">
-                    <p className="tracking-widest text-sm font-isi font-bold text-[#5D4037] uppercase">
-                      {new Date(invitation.eventDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                 </div>
-              </div>
-              
-              {/* KOMPOSISI BAWAH */}
-              <div className="relative w-full h-[350px] md:h-[450px] flex justify-center items-end mt-auto pointer-events-none w-full">
-                 <img src={`${ASSETS}/01-Cover/WAYANG DIATAS GRADIENT.svg`} className="absolute bottom-0 left-0 w-full z-10 opacity-90 mix-blend-multiply object-cover md:object-contain h-full md:h-auto" alt="" />
-                 <img src={`${ASSETS}/01-Cover/PENGANTIN.svg`} className="relative z-20 h-[60%] md:h-[65%] object-contain mb-4" alt="" />
-              </div>
+                  {/* Konten Utama */}
+                  <div className="z-30 text-center relative mt-12 space-y-4 animate-in fade-in zoom-in duration-1000">
+                     <p className="tracking-[0.2em] text-xs uppercase font-bold text-[#8D6E63] mb-2">The Wedding of</p>
+                     <div className="space-y-0">
+                        <h1 className="font-judul text-5xl md:text-6xl font-bold text-[#5D4037] leading-tight">{invitation.groomNick}</h1>
+                        <div className="font-serif text-2xl text-[#8D6E63] my-1">&</div>
+                        <h1 className="font-judul text-5xl md:text-6xl font-bold text-[#5D4037] leading-tight">{invitation.brideNick}</h1>
+                     </div>
 
-           </BaseSectionWrapper>
+                     <div className="mt-6 py-2 border-y border-[#8D6E63] inline-block px-6">
+                        <p className="tracking-widest text-xs font-bold text-[#5D4037] uppercase">
+                           {new Date(invitation.eventDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                     </div>
 
-           {/* SECTION 2: OPENING */}
-           <BaseSectionWrapper id="opening" className="text-center py-20 font-isi px-6 relative">
-             <div className="border border-[#D7CCC8] p-8 rounded-lg relative bg-white/50 backdrop-blur-sm shadow-sm">
-                <p className="relative z-10 text-sm leading-loose italic text-[#5D4037]">"Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu isteri-isteri..."</p>
-                <p className="relative z-10 text-xs font-bold mt-4 text-[#8D6E63]">(Ar-Rum: 21)</p>
-             </div>
-           </BaseSectionWrapper>
-
-           {/* SECTION 3: COUPLE */}
-           <BaseSectionWrapper id="couple" className="text-center py-10 space-y-12 relative">
-             <h2 className="font-judul text-xl font-bold text-[#5D4037] mb-10 tracking-widest uppercase">Mempelai</h2>
-             <div className="mb-12">
-               <GalleryFrame photoSrc={invitation.groomImage || "https://via.placeholder.com/300"} className="w-40 h-40 mx-auto mb-4 rounded-full border-4 border-[#D7CCC8]" />
-               <h3 className="font-judul text-2xl font-bold text-[#5D4037]">{invitation.groomName}</h3>
-               <p className="font-isi text-sm mt-2 text-[#8D6E63]">Putra Bpk. {invitation.groomFather} & Ibu {invitation.groomMother}</p>
-             </div>
-             <div className="text-2xl text-[#8D6E63] font-serif">&</div>
-             <div className="mb-12">
-                <GalleryFrame photoSrc={invitation.brideImage || "https://via.placeholder.com/300"} className="w-40 h-40 mx-auto mb-4 rounded-full border-4 border-[#D7CCC8]"/>
-               <h3 className="font-judul text-2xl font-bold text-[#5D4037]">{invitation.brideName}</h3>
-               <p className="font-isi text-sm mt-2 text-[#8D6E63]">Putri Bpk. {invitation.brideFather} & Ibu {invitation.brideMother}</p>
-             </div>
-           </BaseSectionWrapper>
-
-           {/* SECTION 4: EVENT */}
-           <BaseSectionWrapper id="event" className="text-center py-16 font-isi relative">
-             <div className="bg-[#EFEBE9]/80 rounded-xl p-8 mb-12 shadow-sm border border-[#D7CCC8]">
-                <p className="text-xs uppercase tracking-widest mb-4 font-bold text-[#5D4037]">Menuju Hari Bahagia</p>
-                <div className="grid grid-cols-4 gap-2">
-                   <div><span className="text-2xl font-bold block">{timeLeft.days}</span><span className="text-[10px]">Hari</span></div>
-                   <div><span className="text-2xl font-bold block">{timeLeft.hours}</span><span className="text-[10px]">Jam</span></div>
-                   <div><span className="text-2xl font-bold block">{timeLeft.minutes}</span><span className="text-[10px]">Menit</span></div>
-                   <div><span className="text-2xl font-bold block">{timeLeft.seconds}</span><span className="text-[10px]">Detik</span></div>
-                </div>
-             </div>
-             <div className="space-y-6">
-                <div className="bg-white/80 p-6 rounded-lg border border-[#D7CCC8] shadow-sm relative">
-                   <h4 className="font-bold text-[#5D4037] mb-2 uppercase tracking-wide">Akad Nikah</h4>
-                   <p className="text-sm">{new Date(invitation.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                   <p className="text-sm">{invitation.eventTime}</p>
-                   <p className="font-bold text-[#5D4037] mt-4">{invitation.location}</p>
-                </div>
-                <div className="bg-white/80 p-6 rounded-lg border border-[#D7CCC8] shadow-sm relative">
-                   <h4 className="font-bold text-[#5D4037] mb-2 uppercase tracking-wide">Resepsi</h4>
-                   <p className="text-sm">{new Date(invitation.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                   <p className="text-sm">11:00 WIB - Selesai</p>
-                   <p className="font-bold text-[#5D4037] mt-4">{invitation.location}</p>
-                </div>
-             </div>
-             <div className="mt-8">
-                <a href={invitation.mapUrl || "#"} target="_blank" className="inline-block bg-[#5D4037] text-white px-8 py-3 rounded-full text-sm font-bold shadow hover:bg-[#4E342E] transition-colors">Buka Google Maps</a>
-             </div>
-           </BaseSectionWrapper>
-
-           {/* SECTION 5: LIVE */}
-           <BaseSectionWrapper id="live" className="text-center py-10 font-isi relative">
-              <h3 className="font-bold text-[#5D4037] mb-4 uppercase">Live Streaming</h3>
-              <div className="w-full aspect-video bg-black rounded-lg mb-6 flex items-center justify-center text-white/50">VIDEO PLAYER</div>
-              <button className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold shadow">Tonton di YouTube</button>
-           </BaseSectionWrapper>
-
-           {/* SECTION 6: RSVP */}
-           <BaseSectionWrapper id="rsvp" className="text-center py-10 font-isi relative">
-             <h3 className="font-judul font-bold text-[#5D4037] mb-8 uppercase tracking-widest text-xl">Konfirmasi Kehadiran</h3>
-             <div className="bg-[#EFEBE9]/80 p-6 rounded-lg border border-[#D7CCC8] text-left space-y-4">
-                <div>
-                   <label className="text-xs font-bold text-[#5D4037] block mb-1">Nama</label>
-                   <input type="text" className="w-full bg-white border border-[#D7CCC8] rounded p-2 text-sm" placeholder="Nama Anda" />
-                </div>
-                <div>
-                   <label className="text-xs font-bold text-[#5D4037] block mb-1">Jumlah Tamu</label>
-                   <select className="w-full bg-white border border-[#D7CCC8] rounded p-2 text-sm">
-                      <option>1 Orang</option><option>2 Orang</option>
-                   </select>
-                </div>
-                <div className="flex gap-2">
-                   <button className="flex-1 bg-[#8D6E63] text-white py-2 rounded text-sm hover:opacity-90 transition-opacity">Hadir</button>
-                   <button className="flex-1 bg-gray-300 text-gray-600 py-2 rounded text-sm hover:opacity-90 transition-opacity">Tidak Hadir</button>
-                </div>
-                <button className="w-full bg-[#5D4037] text-white py-3 rounded font-bold mt-4 shadow-lg">Kirim RSVP</button>
-             </div>
-             <div className="mt-12 space-y-4 text-left">
-                <h4 className="font-bold text-center text-sm mb-4 tracking-widest uppercase">Doa & Ucapan</h4>
-                {invitation.wishes?.map((wish) => (
-                  <div key={wish.id} className="bg-white p-4 rounded border border-[#D7CCC8] shadow-sm">
-                     <p className="font-bold text-[#5D4037] text-sm">{wish.guest?.name}</p>
-                     <p className="text-xs text-gray-600 mt-1">{wish.message}</p>
+                     {/* Personalized Guest (Jika ada) */}
+                     {guest && (
+                        <div className="mt-8 bg-white/60 backdrop-blur-sm p-4 rounded-xl border border-[#D7CCC8] shadow-sm max-w-xs mx-auto">
+                           <p className="text-[10px] uppercase tracking-widest text-[#8D6E63] mb-1">Kepada Yth:</p>
+                           <p className="text-lg font-bold text-[#5D4037]">{guest.name}</p>
+                           <p className="text-xs text-[#8D6E63] mt-1">{guest?.category || "Tamu Undangan"}</p>
+                           <button className="mt-3 bg-[#5D4037] text-white text-xs px-6 py-2 rounded-full shadow hover:bg-[#4E342E] transition">Buka Undangan</button>
+                        </div>
+                     )}
                   </div>
-                ))}
-             </div>
-           </BaseSectionWrapper>
 
-           {/* SECTION 7: GIFT */}
-           <BaseSectionWrapper id="gift" className="text-center py-10 font-isi relative">
-              <h3 className="font-judul font-bold text-[#5D4037] mb-6 uppercase tracking-widest text-xl">Wedding Gift</h3>
-              <p className="text-sm px-4 mb-8 text-[#8D6E63]">Bagi Anda yang ingin memberikan tanda kasih:</p>
-              <div className="border border-[#D7CCC8] rounded-lg p-6 bg-white shadow-sm max-w-xs mx-auto">
-                 <div className="font-bold text-lg mb-2">BANK BCA</div>
-                 <p className="text-xl font-mono tracking-widest mb-2 text-[#5D4037]">1234 5678 90</p>
-                 <p className="text-sm text-gray-500 mb-4">a.n {invitation.groomName}</p>
-                 <button className="text-xs border border-[#8D6E63] text-[#8D6E63] px-3 py-1 rounded">Salin Rekening</button>
-              </div>
-           </BaseSectionWrapper>
+                  {/* Gambar Wayang Bawah */}
+                  <div className="relative w-full h-[300px] flex justify-center items-end mt-auto pointer-events-none">
+                     <img src={`${ASSETS}/01-Cover/WAYANG DIATAS GRADIENT.svg`} className="absolute bottom-0 left-0 w-full z-10 opacity-80 mix-blend-multiply" alt="" />
+                     <img src={`${ASSETS}/01-Cover/PENGANTIN.svg`} className="relative z-20 h-[80%] object-contain mb-6" alt="" />
+                  </div>
+               </BaseSectionWrapper>
 
-           {/* SECTION 8: GALLERY */}
-           <BaseSectionWrapper id="gallery" className="pb-20 pt-10 relative">
-              <img src={`${ASSETS}/09-Section 8/GALLERY.svg`} className="w-40 mx-auto mb-8 block" alt="Gallery" />
-              <div className="grid grid-cols-2 gap-3 px-4">
-                 {invitation.gallery?.[0] && <GalleryFrame photoSrc={invitation.gallery[0]} className="aspect-[3/4]" />}
-                 {invitation.gallery?.[1] && <GalleryFrame photoSrc={invitation.gallery[1]} className="aspect-[3/4]" />}
-                 {invitation.gallery?.[2] && <GalleryFrame photoSrc={invitation.gallery[2]} className="col-span-2 aspect-video" />}
-              </div>
-           </BaseSectionWrapper>
+               {/* =================================================================
+              2. AYAT & PEMBUKAAN
+              ================================================================= */}
+               <BaseSectionWrapper id="opening" className="text-center py-20 px-8 relative">
+                  <div className="border-y-2 border-[#D7CCC8] py-8 relative">
+                     <p className="text-sm leading-loose italic text-[#5D4037]">"Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu isteri-isteri dari jenismu sendiri, supaya kamu cenderung dan merasa tenteram kepadanya..."</p>
+                     <p className="text-xs font-bold mt-4 text-[#8D6E63]">(Ar-Rum: 21)</p>
+                  </div>
+               </BaseSectionWrapper>
 
-           {/* SECTION 9: FOOTER */}
-           <BaseSectionWrapper id="footer" className="text-center pt-20 pb-10 font-isi relative">
-              <p className="text-sm mb-6 px-8 text-[#5D4037]">Terima kasih atas doa restu Anda.</p>
-              <h2 className="font-judul text-2xl font-bold text-[#5D4037] mb-2">{invitation.groomNick} & {invitation.brideNick}</h2>
-              <div className="text-[10px] text-gray-400 uppercase tracking-widest mt-10">Designed by Evory</div>
-           </BaseSectionWrapper>
-        
-        </div> {/* End Container mx-auto */}
-      </div> {/* End Kolom Kanan */}
-    </div> // End Wrapper Utama
-  );
+               {/* =================================================================
+              3. BRIDE & GROOM
+              ================================================================= */}
+               <BaseSectionWrapper id="couple" className="text-center py-10 px-6 space-y-16 relative">
+                  <h2 className="font-judul text-3xl font-bold text-[#5D4037]">Mempelai</h2>
+
+                  {/* Groom */}
+                  <div className="flex flex-col items-center space-y-4">
+                     <GalleryFrame
+                        src={invitation.groomImageUrl || "https://placehold.co/400x400/png?text=Groom"}
+                        alt="Groom"
+                        className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]"
+                     />
+                     <div>
+                        <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.groomName}</h3>
+                        <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">Putra Bpk. {invitation.groomFather} & Ibu {invitation.groomMother}</p>
+                     </div>
+                  </div>
+
+                  <div className="text-3xl text-[#8D6E63] font-serif">&</div>
+
+                  {/* Bride */}
+                  <div className="flex flex-col items-center space-y-4">
+                     <GalleryFrame
+                        src={invitation.brideImageUrl || "https://placehold.co/400x400/png?text=Bride"}
+                        alt="Bride"
+                        className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]"
+                     />
+                     <div>
+                        <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.brideName}</h3>
+                        <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">Putri Bpk. {invitation.brideFather} & Ibu {invitation.brideMother}</p>
+                     </div>
+                  </div>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              4. COUNTING DAYS & EVENT DETAIL
+              ================================================================= */}
+               <BaseSectionWrapper id="event" className="text-center py-20 px-6 bg-[#EFEBE9]/30">
+                  <h3 className="font-judul text-2xl font-bold text-[#5D4037] mb-8">Rangkaian Acara</h3>
+
+                  {/* Countdown Box */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-[#D7CCC8] mb-12 max-w-sm mx-auto">
+                     <div className="grid grid-cols-4 gap-2 divide-x divide-[#D7CCC8]">
+                        <div><span className="text-xl font-bold block text-[#5D4037]">{timeLeft.days}</span><span className="text-[10px] uppercase text-[#8D6E63]">Hari</span></div>
+                        <div><span className="text-xl font-bold block text-[#5D4037]">{timeLeft.hours}</span><span className="text-[10px] uppercase text-[#8D6E63]">Jam</span></div>
+                        <div><span className="text-xl font-bold block text-[#5D4037]">{timeLeft.minutes}</span><span className="text-[10px] uppercase text-[#8D6E63]">Menit</span></div>
+                        <div><span className="text-xl font-bold block text-[#5D4037]">{timeLeft.seconds}</span><span className="text-[10px] uppercase text-[#8D6E63]">Detik</span></div>
+                     </div>
+                  </div>
+
+                  {/* Event Cards */}
+                  <div className="space-y-6">
+                     {/* Akad */}
+                     <div className="bg-white p-8 rounded-xl border-l-4 border-[#5D4037] shadow-sm relative overflow-hidden">
+                        <img src={`${ASSETS}/window.svg`} className="absolute right-[-20px] bottom-[-20px] w-24 opacity-10" alt="" />
+                        <h4 className="font-judul text-xl font-bold text-[#5D4037] mb-1">Akad Nikah</h4>
+                        <p className="text-sm text-gray-600 mb-4">{new Date(invitation.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                        <p className="text-sm font-bold text-[#8D6E63]">{invitation.eventTime} WIB</p>
+                        <p className="text-xs text-gray-500 mt-2 max-w-[200px] mx-auto">{invitation.location}</p>
+                     </div>
+
+                     {/* Resepsi */}
+                     <div className="bg-white p-8 rounded-xl border-l-4 border-[#8D6E63] shadow-sm relative overflow-hidden">
+                        <img src={`${ASSETS}/window.svg`} className="absolute right-[-20px] bottom-[-20px] w-24 opacity-10" alt="" />
+                        <h4 className="font-judul text-xl font-bold text-[#5D4037] mb-1">Resepsi</h4>
+                        <p className="text-sm text-gray-600 mb-4">{new Date(invitation.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                        <p className="text-sm font-bold text-[#8D6E63]">11:00 - 13:00 WIB</p>
+                        <p className="text-xs text-gray-500 mt-2 max-w-[200px] mx-auto">{invitation.location}</p>
+                     </div>
+                  </div>
+
+                  <div className="mt-10">
+                     <a href={invitation.mapUrl || "#"} target="_blank" className="inline-flex items-center gap-2 bg-[#5D4037] text-white px-8 py-3 rounded-full text-sm font-bold shadow hover:bg-[#4E342E] transition-colors">
+                        <span>Lihat Lokasi</span>
+                     </a>
+                  </div>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              5. LIVE STREAMING
+              ================================================================= */}
+               <BaseSectionWrapper id="live" className="text-center py-16 px-6">
+                  <h3 className="font-judul text-xl font-bold text-[#5D4037] mb-6">Live Streaming</h3>
+                  <p className="text-sm text-gray-600 mb-6 px-4">Turut berbahagia dari kejauhan melalui siaran langsung acara kami.</p>
+
+                  <div className="aspect-video w-full bg-black rounded-xl mb-6 relative group overflow-hidden shadow-lg border-4 border-white">
+                     <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-white/50 text-xs uppercase tracking-widest">Video Player Placeholder</span>
+                     </div>
+                  </div>
+
+                  <button className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold shadow hover:bg-red-700 transition">
+                     Tonton di YouTube
+                  </button>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              8. LOVE STORY (BARU)
+              ================================================================= */}
+               <BaseSectionWrapper id="lovestory" className="text-center py-20 px-6 bg-white">
+                  <h3 className="font-judul text-2xl font-bold text-[#5D4037] mb-10">Kisah Cinta Kami</h3>
+                  <div className="space-y-8 relative">
+                     {/* Garis Timeline */}
+                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#D7CCC8] -translate-x-1/2"></div>
+
+                     {/* Story 1 */}
+                     <div className="relative z-10">
+                        <div className="bg-[#EFEBE9] p-2 rounded-full inline-block text-xs font-bold text-[#5D4037] mb-2 border border-[#D7CCC8]">2020</div>
+                        <h4 className="font-bold text-[#5D4037]">Pertemuan Pertama</h4>
+                        <p className="text-xs text-gray-600 px-8 mt-1">Kami bertemu di sebuah kedai kopi kecil di Jakarta Selatan...</p>
+                     </div>
+                     {/* Story 2 */}
+                     <div className="relative z-10">
+                        <div className="bg-[#EFEBE9] p-2 rounded-full inline-block text-xs font-bold text-[#5D4037] mb-2 border border-[#D7CCC8]">2023</div>
+                        <h4 className="font-bold text-[#5D4037]">Lamaran</h4>
+                        <p className="text-xs text-gray-600 px-8 mt-1">Dia memberanikan diri untuk meminta restu kepada orang tua...</p>
+                     </div>
+                  </div>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              6. RSVP
+              ================================================================= */}
+               <BaseSectionWrapper id="rsvp" className="text-center py-16 px-6">
+                  <h3 className="font-judul font-bold text-[#5D4037] mb-2 text-2xl">Buku Tamu</h3>
+                  <p className="text-xs text-gray-500 mb-8">Mohon konfirmasi kehadiran Anda</p>
+
+                  <div className="bg-white p-6 rounded-xl border border-[#D7CCC8] shadow-sm text-left space-y-4">
+                     {/* FORM RSVP (Ini nanti perlu di-connect ke Server Action) */}
+                     <div>
+                        <label className="text-xs font-bold text-[#5D4037] block mb-1">Nama Lengkap</label>
+                        <input type="text" className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none" placeholder="Isi nama Anda..." defaultValue={guest?.name || ""} />
+                     </div>
+                     <div>
+                        <label className="text-xs font-bold text-[#5D4037] block mb-1">Kehadiran</label>
+                        <select className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none">
+                           <option value="ATTENDING">Hadir</option>
+                           <option value="DECLINED">Berhalangan</option>
+                        </select>
+                     </div>
+                     <div>
+                        <label className="text-xs font-bold text-[#5D4037] block mb-1">Ucapan & Doa</label>
+                        <textarea className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24" placeholder="Tulis ucapan selamat..." />
+                     </div>
+                     <button className="w-full bg-[#5D4037] text-white py-3 rounded-lg font-bold mt-2 shadow hover:bg-[#4E342E] transition">Kirim Konfirmasi</button>
+                  </div>
+
+                  {/* GANTI LOGIC WISHES LIST MENJADI: */}
+                  <div className="mt-12 space-y-4 text-left max-h-96 overflow-y-auto pr-2">
+                     <h4 className="font-bold text-center text-sm mb-4 tracking-widest uppercase text-[#8D6E63]">Ucapan Terbaru</h4>
+
+                     {/* PERBAIKAN DI SINI: Pakai tanda tanya (?) */}
+                     {invitation.wishes && invitation.wishes.length > 0 ? (
+                        invitation.wishes.map((wish) => (
+                           <div key={wish.id} className="bg-white/50 p-4 rounded-lg border border-[#D7CCC8] shadow-sm">
+                              {/* Gunakan optional chaining untuk nama tamu juga */}
+                              <p className="font-bold text-[#5D4037] text-sm">{wish.guest?.name || "Tamu"}</p>
+                              <p className="text-xs text-gray-600 mt-1 leading-relaxed">"{wish.message}"</p>
+                           </div>
+                        ))
+                     ) : (
+                        <p className="text-center text-xs text-gray-400 italic">Belum ada ucapan. Jadilah yang pertama!</p>
+                     )}
+                  </div>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              7. WEDDING GIFT
+              ================================================================= */}
+               <BaseSectionWrapper id="gift" className="text-center py-16 px-6 bg-[#EFEBE9]/30">
+                  <h3 className="font-judul font-bold text-[#5D4037] mb-6 text-xl">Tanda Kasih</h3>
+                  <p className="text-sm px-4 mb-8 text-[#8D6E63]">Doa restu Anda merupakan karunia yang sangat berarti bagi kami.</p>
+
+                  <div className="grid gap-4">
+                     {/* Bank Card (Looping nanti dari DB) */}
+                     <div className="border border-[#D7CCC8] rounded-xl p-6 bg-white shadow-sm max-w-xs mx-auto w-full">
+                        <div className="font-bold text-lg mb-2 text-slate-800">BCA</div>
+                        <p className="text-xl font-mono tracking-widest mb-1 text-[#5D4037] select-all">1234567890</p>
+                        <p className="text-xs text-gray-500 mb-4 uppercase">a.n {invitation.groomName}</p>
+                        <button
+                           className="text-xs border border-[#8D6E63] text-[#8D6E63] px-4 py-1.5 rounded-full hover:bg-[#8D6E63] hover:text-white transition"
+                           onClick={() => navigator.clipboard.writeText("1234567890")}
+                        >
+                           Salin No. Rekening
+                        </button>
+                     </div>
+                  </div>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              9. GALLERY
+              ================================================================= */}
+               <BaseSectionWrapper id="gallery" className="py-20 px-4 relative">
+                  <h3 className="font-judul font-bold text-[#5D4037] mb-8 text-center text-2xl">Galeri Foto</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                     {/* Logic Tampilan Grid: Foto pertama besar, sisanya kecil */}
+                     {invitation.gallery?.length > 0 ? (
+                        invitation.gallery.map((url, i) => (
+                           <GalleryFrame
+                              key={i}
+                              src={url}
+                              alt={`Gallery ${i}`}
+                              className={i % 3 === 0 ? "col-span-2 aspect-video" : "aspect-[3/4]"}
+                           />
+                        ))
+                     ) : (
+                        <p className="col-span-2 text-center text-xs text-gray-400">Belum ada foto galeri.</p>
+                     )}
+                  </div>
+               </BaseSectionWrapper>
+
+               {/* =================================================================
+              10. FOOTER & EVORY LICENSE
+              ================================================================= */}
+               <BaseSectionWrapper id="footer" className="text-center pt-24 pb-12 font-isi relative bg-[#5D4037] text-[#D7CCC8]">
+                  <p className="text-sm mb-8 px-8 opacity-80">Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir untuk memberikan doa restu.</p>
+                  <h2 className="font-judul text-3xl font-bold mb-10">{invitation.groomNick} & {invitation.brideNick}</h2>
+
+                  <div className="border-t border-white/10 pt-8 mt-8">
+                     <p className="text-[10px] uppercase tracking-[0.2em] opacity-50 mb-2">Powered By</p>
+                     <div className="flex items-center justify-center gap-2 font-bold text-lg tracking-tight">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span> Evory Platform
+                     </div>
+                     <p className="text-[9px] mt-4 opacity-30">© 2026 Evory. All Rights Reserved.</p>
+                  </div>
+               </BaseSectionWrapper>
+
+            </div>
+         </div>
+      </div>
+   );
 }

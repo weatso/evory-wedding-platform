@@ -5,13 +5,12 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com',
+        hostname: 'placehold.co', // Izinkan placeholder
       },
-      // Tambahkan domain lain di sini jika nanti pakai Supabase Storage
-      // {
-      //   protocol: 'https',
-      //   hostname: 'xyz.supabase.co',
-      // }
+      {
+        protocol: 'https',
+        hostname: 'cksyuviluwywysyjcouu.supabase.co', // Izinkan Supabase Storage Anda
+      }
     ],
   },
 };

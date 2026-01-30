@@ -1,43 +1,46 @@
-"use client";
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
+import { getTemplate } from "@/components/templates/registry"; // Panggil Registry
 
-import { useParams } from "next/navigation";
-import { getTemplate } from "@/components/templates/registry";
-import { MOCK_WEDDING_DATA } from "@/lib/mock-data";
-import React, { useMemo } from "react";
+type Props = {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ u?: string }>; 
+};
 
-export default function InvitationPage() {
-  const params = useParams();
-  const slug = params.slug as string;
+export default async function InvitationPage(props: Props) {
+    const params = await props.params;
+    const searchParams = await props.searchParams;
 
-  // 1. Ambil ID Template (Untuk tes, kita pakai "MIN_01")
-  const templateId = "MIN_01"; 
+    // 1. Ambil Data Undangan (Lengkap dengan Wishes)
+    const inv = await prisma.invitation.findUnique({
+        where: { slug: params.slug },
+        include: { 
+            wishes: { orderBy: { createdAt: 'desc' }, take: 20 } 
+        }
+    });
 
-  // 2. Ambil komponen secara dinamis lewat registry
-  const TemplateComponent = useMemo(() => getTemplate(templateId), [templateId]);
+    if (!inv || !inv.isActive) return notFound();
 
-  // 3. Gunakan data dari Mock Data (Gunakan data alih-alih MOCK_WEDDING_DATA agar lebih rapi)
-  const data = MOCK_WEDDING_DATA;
+    // 2. Cek Data Tamu (Jika ada kode ?u=...)
+    let guestData = null;
+    if (searchParams.u) {
+        guestData = await prisma.guest.findFirst({
+            where: { 
+                guestCode: searchParams.u,
+                invitationId: inv.id 
+            }
+        });
+    }
 
-  return (
-    <div className="relative min-h-screen w-full bg-evory-base overflow-x-hidden">
-      
-      {/* DESKTOP WINGS: Latar belakang lebar yang di-blur di sisi luar laptop */}
-      <div 
-        className="fixed inset-0 z-0 hidden lg:block opacity-30 blur-xl pointer-events-none"
-        style={{ 
-          backgroundImage: `url('/templates/${templateId}/bg-desktop.webp')`,
-          backgroundSize: 'cover'
-        }}
-      />
+    // 3. Minta Registry memilihkan Template
+    // (Misal inv.templateId = "jvn-01", maka dia panggil komponen Javanese)
+    const TemplateComponent = getTemplate(inv.templateId);
 
-      {/* PANGGUNG UTAMA: Konten utama dikunci di lebar 400px (Mobile-First) */}
-      <div className="relative z-10 mx-auto w-full max-w-[400px] shadow-2xl bg-white min-h-screen">
+    // 4. Render Template dengan Data
+    return (
         <TemplateComponent 
-          invitation={data.invitation} 
-          guest={data.guest} 
-          config={data.config} 
+            invitation={inv} 
+            guest={guestData} 
         />
-      </div>
-    </div>
-  );
+    );
 }
