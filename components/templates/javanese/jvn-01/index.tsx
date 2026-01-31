@@ -1,13 +1,13 @@
 "use client";
 
-import { WeddingTemplateProps, LoveStory } from "@/types/template";
-import localFont from 'next/font/local';
-import Image from "next/image"; 
-import { useEffect, useState, useTransition } from "react"; 
-import BaseSectionWrapper from "../../base/BaseSectionWrapper";
 import { submitRsvp } from "@/app/invitation/actions";
-import { useAudio } from "@/hooks/useAudio"; 
-import { Music, Pause, CalendarCheck, MapPin } from "lucide-react"; 
+import { useAudio } from "@/hooks/useAudio";
+import { LoveStory, WeddingTemplateProps } from "@/types/template";
+import { CalendarCheck, MapPin, Music, Pause } from "lucide-react";
+import localFont from 'next/font/local';
+import Image from "next/image";
+import { useEffect, useState, useTransition } from "react";
+import BaseSectionWrapper from "../../base/BaseSectionWrapper";
 
 // --- 1. KONFIGURASI FONT ---
 const fontJudul = localFont({
@@ -22,6 +22,44 @@ const fontIsi = localFont({
    display: 'swap'
 });
 
+const fontCustomLengkap = localFont({
+  src: [
+    // 1. File Italic (Biasanya dianggap Regular Italic / 400)
+    {
+      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-Italic-VariableFont_wght.ttf',
+      weight: '400', 
+      style: 'italic',
+    },
+    // 2. File ExtraLight -> Gunakan angka 200
+    {
+      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-ExtraLight.ttf',
+      weight: '200', 
+      style: 'normal',
+    },
+    // 3. File Light -> Gunakan angka 300
+    {
+      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-Light.ttf',
+      weight: '300', 
+      style: 'normal',
+    },
+    // 4. File Medium -> Gunakan angka 500
+    // (Catatan: Medium biasanya tegak/normal. Jika file Anda memang miring, biarkan style: italic. Jika tidak, ubah ke normal)
+    {
+      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-Medium.ttf',
+      weight: '500', 
+      style: 'normal', 
+    },
+    // 5. File SemiBold -> Gunakan angka 600
+    {
+      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-SemiBold.ttf',
+      weight: '600', 
+      style: 'normal',
+    },
+  ],
+  variable: '--font-custom', // Cuma butuh 1 variabel untuk semua gaya di atas!
+  display: 'swap',
+});
+
 // BASE URL ASSETS (SVG Default)
 const ASSETS = "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/system-asset/jvn-01";
 
@@ -33,13 +71,13 @@ const COLORS = {
 
 // HELPER: Google Calendar
 const generateGoogleCalendar = (invitation: any) => {
-    const date = new Date(invitation.eventDate);
-    const start = date.toISOString().replace(/-|:|\.\d+/g, ""); 
-    const endDate = new Date(date.getTime() + 2 * 60 * 60 * 1000); 
-    const end = endDate.toISOString().replace(/-|:|\.\d+/g, "");
-    
-    return `https://www.google.com/calendar/render?action=TEMPLATE&text=The+Wedding+of+${invitation.groomNick}+%26+${invitation.brideNick}&dates=${start}/${end}&details=Tanpa+mengurangi+rasa+hormat,+kami+mengundang+Bapak/Ibu+untuk+hadir.&location=${invitation.location}&sf=true&output=xml`;
- };
+   const date = new Date(invitation.eventDate);
+   const start = date.toISOString().replace(/-|:|\.\d+/g, "");
+   const endDate = new Date(date.getTime() + 2 * 60 * 60 * 1000);
+   const end = endDate.toISOString().replace(/-|:|\.\d+/g, "");
+
+   return `https://www.google.com/calendar/render?action=TEMPLATE&text=The+Wedding+of+${invitation.groomNick}+%26+${invitation.brideNick}&dates=${start}/${end}&details=Tanpa+mengurangi+rasa+hormat,+kami+mengundang+Bapak/Ibu+untuk+hadir.&location=${invitation.location}&sf=true&output=xml`;
+};
 
 // KOMPONEN: Frame Foto
 const GalleryFrame = ({ src, alt, className }: { src: string, alt: string, className?: string }) => (
@@ -66,7 +104,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
    // LOGIC BACKGROUND (WINGS vs PAPER)
    // 1. Wings (Desktop Background): Bisa ditimpa foto client
    const wingsBg = themeConfig.desktopBackground || `${ASSETS}/wing/FotoWings.svg`;
-   
+
    // 2. Paper (Mobile/Content Background): Tetap pattern kertas
    const paperBg = `${ASSETS}/01-Cover/PATTERN ATAS BACKGROUND.svg`;
 
@@ -93,7 +131,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
          try {
             await submitRsvp(guest.id, rsvpForm.attendance as "ATTENDING" | "DECLINED", rsvpForm.message);
             alert("Konfirmasi terkirim! Terima kasih.");
-            setRsvpForm(prev => ({ ...prev, message: "" })); 
+            setRsvpForm(prev => ({ ...prev, message: "" }));
          } catch (error) {
             console.error(error);
             alert("Gagal mengirim data.");
@@ -105,14 +143,14 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
       <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
 
          {/* --- MUSIC PLAYER --- */}
-         <button 
+         <button
             onClick={toggle}
             className={`fixed bottom-6 right-6 z-50 p-3 rounded-full shadow-lg transition-all duration-500 border-2 border-white/20 ${playing ? 'bg-[#5D4037] animate-spin-slow' : 'bg-stone-400'}`}
          >
             {playing ? <Pause className="text-white w-5 h-5" /> : <Music className="text-white w-5 h-5" />}
          </button>
 
-       {/* --- LAYER 0: WINGS AREA (KIRI) DENGAN ORNAMEN --- 
+         {/* --- LAYER 0: WINGS AREA (KIRI) DENGAN ORNAMEN --- 
              Konsep: Container Relative -> Aset di dalamnya Absolute
          */}
          <div
@@ -125,29 +163,110 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                backgroundRepeat: 'no-repeat',
             }}
          >
+
+            {/* 1. Overlay Gelap */}
+            <div className="absolute inset-0 bg-black/20 z-0"></div>
+
+            {/* =======================================
+                BAGIAN KIRI: NAMA MEMPELAI (Yang Tadi)
+            ======================================= */}
+            <div className="absolute inset-y-0 left-0 w-1/3 z-20 flex flex-col justify-center items-center px-4">
+               {/* Badge */}
+               <div className="mb-8 px-6 py-2 bg-[#5D4037]/90 backdrop-blur-md rounded-full border border-[#D7CCC8]/50 shadow-xl">
+                  <p className="font-isi text-[#F1F1E8] tracking-[0.2em] uppercase text-[10px] md:text-xs font-semibold whitespace-nowrap">
+                     The Wedding of
+                  </p>
+               </div>
+
+               {/* Nama */}
+               <div className="text-center text-[#F1F1E8] drop-shadow-2xl space-y-2">
+                  <div className="text-6xl font-isi md:text-7xl xl:text-8xl leading-none">{invitation.groomNick}</div>
+                  <div className="text-3xl font-isi  text-[#D7CCC8]">&</div>
+                  <div className="text-6xl font-isi md:text-7xl xl:text-8xl leading-none">{invitation.brideNick}</div>
+               </div>
+            </div>
+
+            {/* =======================================
+                BAGIAN KANAN: TANGGAL VERTIKAL (BARU!)
+                Posisi: absolute right-16 (Jarak dari batas kertas undangan)
+            ======================================= */}
+            <div className="absolute top-1/2 right-12 -translate-y-1/2 z-20 flex flex-col items-center justify-center space-y-3">
+
+               {/* LOGIKA FORMAT TANGGAL OTOMATIS */}
+               {(() => {
+                  const date = new Date(invitation.eventDate || new Date());
+                  const dd = String(date.getDate()).padStart(2, '0');      // 01
+                  const mm = String(date.getMonth() + 1).padStart(2, '0'); // 01
+                  const yy = String(date.getFullYear()).slice(-2);         // 26
+
+                  // Style Font Tanggal
+                  const dateStyle = "font-judul text-5xl md:text-6xl text-[#F1F1E8] drop-shadow-lg font-normal";
+                  // Style Garis Pemisah
+                  const lineStyle = "w-16 h-[4px] bg-[#D7CCC8] rounded-full";
+
+                  return (
+                     <>
+                        {/* HARI (01) */}
+                        <span className={dateStyle}>{dd}</span>
+
+                        {/* GARIS 1 */}
+                        <div className={lineStyle}></div>
+
+                        {/* BULAN (01) */}
+                        <span className={dateStyle}>{mm}</span>
+
+                        {/* GARIS 2 */}
+                        <div className={lineStyle}></div>
+
+                        {/* TAHUN (26) */}
+                        <span className={dateStyle}>{yy}</span>
+                     </>
+                  );
+               })()}
+
+            </div>
+
+            {/* 3. Ornamen Tambahan (Jika mau dihidupkan lagi) */}
+            {/* <img src={`${ASSETS}/sudut.svg`} className="absolute top-0 left-0..." /> */}
+
+            {/* 3. Ornamen Tambahan (Opsional - Sesuai request sebelumnya) */}
+            {/* <img src={`${ASSETS}/sudut-kiri-atas.svg`} className="absolute top-0 left-0 w-48 opacity-80 z-10 pointer-events-none" alt="" /> */}
+            {/* <img src={`${ASSETS}/sudut-kiri-bawah.svg`} className="absolute bottom-0 left-0 w-56 opacity-80 z-10 pointer-events-none" alt="" /> */}
+
+
+
+
             {/* ---  OVERLAY GRADIENT (Opsional) --- 
                 Supaya ornamen SVG terlihat lebih jelas jika background fotonya terang.
             */}
-            <img 
+            <img
                src={`${ASSETS}/wing/GradientWings.svg`} // Ganti nama file aset designer Anda
                className="absolute -top-5 left-0 w-full h-[110%] object-cover opacity-80 z-10 pointer-events-none"
                alt="Ornamen Gradient"
             />
-            
+
             {/* ---  ORNAMEN POJOK KIRI ATAS --- */}
-            <img 
+            <img
                src={`${ASSETS}/wing/DaunAtasKiriWings.svg`} // Ganti nama file aset designer Anda
-               className="absolute -top-30 -left-15 w-52 opacity-80 z-10 pointer-events-none"
+               className="absolute -top-40 -left-50 w-[35%] h-[35%] opacity-80 z-10 pointer-events-none"
                alt="Ornamen Atas"
             />
 
             {/* ---  ORNAMEN POJOK KIRI BAWAH --- */}
-            <img 
-               src={`${ASSETS}/wing/DaunKiriBawahWings.svg`} 
-               className="absolute -bottom-30 -left-10 w-[25%] opacity-80 z-10 pointer-events-none"
+            <img
+               src={`${ASSETS}/wing/DaunKiriBawahWings.svg`}
+               className="absolute -bottom-30 -left-10 w-[25%] h-[25%] opacity-80 z-10 pointer-events-none"
+               alt="Ornamen Bawah"
+            />
+
+            {/* ---  ORNAMEN POJOK KANAN BAWAH --- */}
+            <img
+               src={`${ASSETS}/wing/DaunKananBawahWings.svg`}
+               className="absolute -bottom-40 -right-10 w-[25%] h-[25%] opacity-80 z-10 pointer-events-none"
                alt="Ornamen Bawah"
             />
          </div>
+
 
          {/* --- LAYER 1: PAPER (CONTENT WRAPPER) --- 
              Ini adalah kertas undangan utama. Backgroundnya terpisah dari Wings.
@@ -157,8 +276,8 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
             style={{
                backgroundColor: COLORS.paper,
                backgroundImage: `url('${paperBg}')`,
-               backgroundRepeat: 'repeat-y', 
-               backgroundSize: '100% auto', 
+               backgroundRepeat: 'repeat-y',
+               backgroundSize: '100% auto',
                backgroundBlendMode: 'multiply'
             }}
          >
@@ -177,7 +296,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                         <div className="font-serif text-2xl text-[#8D6E63] my-1">&</div>
                         <h1 className="font-judul text-5xl md:text-6xl font-bold text-[#5D4037] leading-tight">{invitation.brideNick}</h1>
                      </div>
-                     
+
                      <div className="mt-6 py-2 border-y border-[#8D6E63] inline-block px-6">
                         <p className="tracking-widest text-xs font-bold text-[#5D4037] uppercase">
                            {new Date(invitation.eventDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -188,8 +307,8 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                      {guest && (
                         <div className="mt-8 bg-white/60 backdrop-blur-sm p-4 rounded-xl border border-[#D7CCC8] shadow-sm max-w-xs mx-auto animate-in slide-in-from-bottom-5">
                            <p className="text-[10px] uppercase tracking-widest text-[#8D6E63] mb-1">Kepada Yth:</p>
-                           <p className="text-lg font-bold text-[#5D4037]">{guest.name}</p>
-                           <p className="text-xs text-[#8D6E63] mt-1">{guest.category || "Tamu Undangan"}</p>
+                           <p className="text-lg font-bold text-[#5D4037]">{guest?.name}</p>
+                           <p className="text-xs text-[#8D6E63] mt-1">{guest?.category || "Tamu Undangan"}</p>
                            <button className="mt-3 bg-[#5D4037] text-white text-xs px-6 py-2 rounded-full shadow hover:bg-[#4E342E] transition">Buka Undangan</button>
                         </div>
                      )}
@@ -213,7 +332,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                {/* SECTION 3: COUPLE */}
                <BaseSectionWrapper id="couple" className="text-center py-10 px-6 space-y-16 relative">
                   <h2 className="font-judul text-3xl font-bold text-[#5D4037]">Mempelai</h2>
-                  
+
                   {/* Groom */}
                   <div className="flex flex-col items-center space-y-4">
                      <GalleryFrame src={invitation.groomImageUrl || "https://placehold.co/400x400/png?text=Groom"} alt="Groom" className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]" />
@@ -238,7 +357,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                {/* SECTION 4: EVENT */}
                <BaseSectionWrapper id="event" className="text-center py-20 px-6 bg-[#EFEBE9]/30">
                   <h3 className="font-judul text-2xl font-bold text-[#5D4037] mb-8">Rangkaian Acara</h3>
-                  
+
                   {/* Countdown */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-[#D7CCC8] mb-12 max-w-sm mx-auto">
                      <div className="grid grid-cols-4 gap-2 divide-x divide-[#D7CCC8]">
@@ -322,11 +441,11 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                      </div>
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Ucapan & Doa</label>
-                        <textarea className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24" placeholder="Tulis ucapan selamat..." value={rsvpForm.message} onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })} disabled={!guest || isPending}/>
+                        <textarea className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24" placeholder="Tulis ucapan selamat..." value={rsvpForm.message} onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })} disabled={!guest || isPending} />
                      </div>
                      <button onClick={handleRsvpSubmit} disabled={!guest || isPending} className="w-full bg-[#5D4037] text-white py-3 rounded-lg font-bold mt-2 shadow hover:bg-[#4E342E] transition disabled:opacity-50">{isPending ? "Mengirim..." : "Kirim Konfirmasi"}</button>
                   </div>
-                  
+
                   {/* UCAPAN LIST */}
                   <div className="mt-12 space-y-4 text-left max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                      <h4 className="font-bold text-center text-sm mb-4 tracking-widest uppercase text-[#8D6E63]">Ucapan Terbaru</h4>
