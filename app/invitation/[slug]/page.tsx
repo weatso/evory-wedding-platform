@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { getTemplate } from "@/components/templates/registry"; // Panggil Registry
+import { getTemplate } from "@/components/templates/registry"; 
 
 type Props = {
     params: Promise<{ slug: string }>;
@@ -11,11 +11,16 @@ export default async function InvitationPage(props: Props) {
     const params = await props.params;
     const searchParams = await props.searchParams;
 
-    // 1. Ambil Data Undangan (Lengkap dengan Wishes)
+    // 1. Ambil Data Undangan
     const inv = await prisma.invitation.findUnique({
         where: { slug: params.slug },
         include: { 
-            wishes: { orderBy: { createdAt: 'desc' }, take: 20 } 
+            // [FIX] Tambahkan include: { guest: true } di sini!
+            wishes: { 
+                include: { guest: true }, 
+                orderBy: { createdAt: 'desc' }, 
+                take: 20 
+            } 
         }
     });
 
@@ -32,11 +37,9 @@ export default async function InvitationPage(props: Props) {
         });
     }
 
-    // 3. Minta Registry memilihkan Template
-    // (Misal inv.templateId = "jvn-01", maka dia panggil komponen Javanese)
+    // 3. Render Template
     const TemplateComponent = getTemplate(inv.templateId);
 
-    // 4. Render Template dengan Data
     return (
         <TemplateComponent 
             invitation={inv} 

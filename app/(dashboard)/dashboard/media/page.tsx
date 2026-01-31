@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import ClientAssetsForm from "../ClientAssetsForm"; // Import dari folder dashboard parent
+import ClientAssetsForm from "../ClientAssetsForm"; 
 
 type Props = {
   searchParams: Promise<{ viewAs?: string }>;
@@ -15,7 +15,6 @@ export default async function MediaPage(props: Props) {
   const viewAsId = searchParams.viewAs;
   const userRole = session.user.role;
   
-  // Logic Admin View As
   const targetUserId = (userRole === "ADMIN" && viewAsId) ? viewAsId : session.user.id; 
 
   const invitation = await prisma.invitation.findFirst({
@@ -24,20 +23,24 @@ export default async function MediaPage(props: Props) {
 
   if (!invitation) return <div className="p-8 text-center text-red-500">Data undangan tidak ditemukan.</div>;
 
+  // Ambil URL Wings dari themeConfig (jika ada)
+  const themeConfig = (invitation.themeConfig as any) || {};
+  const initialWings = themeConfig.desktopBackground || null;
+
   return (
-    // Menggunakan max-w-5xl agar layout 2 kolom (Tabs) terlihat lega
     <div className="max-w-5xl mx-auto space-y-6">
         <div>
             <h1 className="text-2xl font-bold text-slate-900">Media & Aset Digital</h1>
-            <p className="text-slate-500">Kelola foto profil mempelai, cover utama, dan galeri prewedding.</p>
+            <p className="text-slate-500">Kelola foto profil mempelai, cover utama, background desktop, dan galeri.</p>
         </div>
         
         <ClientAssetsForm 
             invitationId={invitation.id}
             userId={targetUserId}
             initialCover={invitation.coverImageUrl}
-            initialGroom={invitation.groomImageUrl} // [BARU] Foto Mempelai Pria
-            initialBride={invitation.brideImageUrl} // [BARU] Foto Mempelai Wanita
+            initialGroom={invitation.groomImageUrl} 
+            initialBride={invitation.brideImageUrl} 
+            initialWings={initialWings} // [BARU] Kirim data wings ke form
             initialGallery={invitation.gallery}
         />
     </div>

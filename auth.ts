@@ -4,13 +4,12 @@ import { prisma } from "@/lib/db"
 import { authConfig } from "./auth.config"
 
 export const { 
-  handlers: { GET, POST }, 
+  handlers, 
   auth, 
   signIn, 
   signOut 
 } = NextAuth({
-  // FIX ERROR: Gunakan 'as any' untuk bypass cek versi strict TypeScript
-  // karena secara fungsional ini kompatibel.
+  // [FIX] Tambahkan 'as any' di sini untuk bypass error tipe 'role'
   adapter: PrismaAdapter(prisma) as any, 
   session: { strategy: "jwt" },
   ...authConfig,

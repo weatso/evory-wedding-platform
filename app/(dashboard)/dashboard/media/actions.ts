@@ -4,24 +4,47 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-// 1. Update Foto Spesifik (Cover, Groom, atau Bride)
+// 1. Update Foto Spesifik (Cover, Groom, Bride, ATAU Wings)
 export async function updateInvitationImage(
   invitationId: string, 
-  field: "cover" | "groom" | "bride", 
+  field: "cover" | "groom" | "bride" | "wings", 
   url: string
 ) {
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
 
-  const dataToUpdate: any = {};
-  if (field === "cover") dataToUpdate.coverImageUrl = url;
-  if (field === "groom") dataToUpdate.groomImageUrl = url;
-  if (field === "bride") dataToUpdate.brideImageUrl = url;
+  // Jika update Wings, kita harus update kolom JSON themeConfig
+  if (field === "wings") {
+      const currentInv = await prisma.invitation.findUnique({
+          where: { id: invitationId },
+          select: { themeConfig: true }
+      });
 
-  await prisma.invitation.update({
-    where: { id: invitationId },
-    data: dataToUpdate,
-  });
+      const currentConfig = (currentInv?.themeConfig as any) || {};
+      
+      // Merge config lama dengan background baru
+      const newConfig = {
+          ...currentConfig,
+          desktopBackground: url
+      };
+
+      await prisma.invitation.update({
+          where: { id: invitationId },
+          data: { themeConfig: newConfig }
+      });
+
+  } else {
+      // Logic lama untuk kolom biasa
+      const dataToUpdate: any = {};
+      if (field === "cover") dataToUpdate.coverImageUrl = url;
+      if (field === "groom") dataToUpdate.groomImageUrl = url;
+      if (field === "bride") dataToUpdate.brideImageUrl = url;
+
+      await prisma.invitation.update({
+        where: { id: invitationId },
+        data: dataToUpdate,
+      });
+  }
 
   revalidatePath("/dashboard/media");
 }

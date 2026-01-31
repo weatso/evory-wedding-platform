@@ -1,6 +1,13 @@
 // types/template.ts
 import { Guest, Invitation, Wish } from "@prisma/client";
 
+export interface LoveStory {
+  year: string;
+  title: string;
+  story: string;
+  image?: string;
+}
+
 // Definisikan Wish yang membawa data Guest (untuk nama di ucapan)
 export type WishWithGuest = Wish & {
   guest: Guest | null;

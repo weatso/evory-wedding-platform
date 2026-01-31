@@ -1,42 +1,20 @@
-'use server';
+"use server";
 
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma"; //
+import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
-/**
- * SCHEMA VALIDASI (ZOD)
- */
-const RsvpSchema = z.object({
-  guestId: z.string().min(1, "Guest ID wajib diisi"),
-  status: z.enum(["ATTENDING", "DECLINED"]),
-  pax: z.coerce.number().min(1, "Minimal 1 orang").max(10, "Maksimal 10 orang"),
-  message: z.string().optional(),
-});
-
-export async function submitRsvp(formData: FormData) {
-  const rawData = {
-    guestId: formData.get("guestId"),
-    status: formData.get("status"),
-    pax: formData.get("pax"),
-    message: formData.get("message"),
-  };
-
-  const validated = RsvpSchema.safeParse(rawData);
-
-  // PERBAIKAN: Gunakan validated.error.issues untuk mengambil pesan error
-  if (!validated.success) {
-    return { 
-      success: false, 
-      error: validated.error.issues[0].message 
-    };
-  }
-
-  const { guestId, status, pax, message } = validated.data;
-
+// --- FUNGSI UTAMA RSVP (Dipanggil dari Template) ---
+export async function submitRsvp(
+  guestId: string, 
+  status: "ATTENDING" | "DECLINED", 
+  message?: string
+) {
   try {
-    // SECURITY AUDIT: Ambil jatah kursi tamu
+    // 1. Validasi Input Dasar
+    if (!guestId) throw new Error("Guest ID wajib diisi.");
+    if (!status) throw new Error("Status kehadiran wajib dipilih.");
+
+    // 2. Ambil Data Tamu (Untuk Cek Kuota & ID Undangan)
     const guest = await prisma.guest.findUnique({
       where: { id: guestId },
       select: { 
@@ -47,30 +25,28 @@ export async function submitRsvp(formData: FormData) {
       }
     });
 
-    if (!guest) {
-      return { success: false, error: "Data tamu tidak ditemukan." };
-    }
+    if (!guest) throw new Error("Data tamu tidak ditemukan.");
 
-    // CEK KUOTA: Cegah tamu membawa orang melebihi jatah
-    if (status === "ATTENDING" && pax > guest.totalPaxAllocated) {
-      return { 
-        success: false, 
-        error: `Maaf, jumlah tamu melebihi jatah kursi (${guest.totalPaxAllocated} pax).` 
-      };
-    }
+    // 3. Tentukan Jumlah Pax (Kursi yang terpakai)
+    // Jika Hadir -> Pakai jatah maksimal (atau bisa diubah nanti jika ada input manual)
+    // Jika Tidak Hadir -> 0
+    const paxToUpdate = status === "ATTENDING" ? guest.totalPaxAllocated : 0;
 
-    // UPDATE DATABASE
+    // 4. Eksekusi Database (Transaction)
     await prisma.$transaction(async (tx) => {
+      // A. Update Status Tamu
       await tx.guest.update({
         where: { id: guestId },
         data: {
           rsvpStatus: status,
-          pax: status === "ATTENDING" ? pax : 0,
+          pax: paxToUpdate,
+          // Reset status check-in jika tamu batal hadir
           isCheckedIn: status === "ATTENDING" ? undefined : false,
           checkInTime: status === "ATTENDING" ? undefined : null,
         },
       });
 
+      // B. Simpan Ucapan (Jika ada pesan)
       if (message && message.trim().length > 0) {
         await tx.wish.create({
           data: {
@@ -82,32 +58,28 @@ export async function submitRsvp(formData: FormData) {
       }
     });
 
-    revalidatePath(`/invitation/${guest.invitation.slug}`);
+    // 5. Refresh Halaman (Agar data terbaru muncul)
+    revalidatePath(`/invitation/${guest.invitation.slug}`); // Refresh Halaman Undangan
+    revalidatePath(`/dashboard`); // Refresh Dashboard Admin/Client
     
     return { success: true };
 
   } catch (error) {
-    console.error("Critical RSVP Error:", error);
-    return { 
-      success: false, 
-      error: "Gagal memproses RSVP. Silakan coba lagi." 
-    };
+    console.error("RSVP Error:", error);
+    // Kembalikan error sebagai string agar bisa ditangkap di frontend
+    throw new Error(error instanceof Error ? error.message : "Gagal menyimpan RSVP.");
   }
 }
 
-export async function updateInvitationAssets(invitationId: string, data: { coverImageUrl?: string }) {
-  const session = await auth();
-  if (!session) throw new Error("Unauthorized");
-
-  // Validasi: Pastikan user adalah pemilik undangan ATAU admin
-  // (Logic validasi sederhana)
+// --- FUNGSI TAMBAHAN (Opsional) ---
+export async function sendWish(invitationId: string, message: string) {
+  if (!message || message.trim() === "") return;
   
-  await prisma.invitation.update({
-    where: { id: invitationId },
+  await prisma.wish.create({
     data: {
-        ...(data.coverImageUrl && { coverImageUrl: data.coverImageUrl }),
+      message: message.trim(),
+      invitationId,
     }
   });
-
-  revalidatePath("/dashboard");
+  revalidatePath(`/invitation`);
 }
