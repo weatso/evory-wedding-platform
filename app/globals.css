@@ -10,6 +10,14 @@
   
   --font-serif: var(--font-serif);
   --font-sans: var(--font-sans);
+  /* Membuat class: font-judul */
+  --font-judul: var(--font-judul); 
+
+  /* Membuat class: font-isi */
+  --font-isi: var(--font-isi);
+
+  /* Membuat class: font-custom */
+  --font-custom: var(--font-custom);
 
   /* --- ANIMASI CUSTOM --- */
   --animate-marquee: marquee 30s linear infinite;

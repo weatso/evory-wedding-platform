@@ -140,7 +140,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
    };
 
    return (
-      <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
+      <div className={`${fontIsi.variable} ${fontJudul.variable} ${fontCustomLengkap.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
 
          {/* --- MUSIC PLAYER --- */}
          <button
@@ -169,11 +169,20 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
 
             {/* =======================================
                 BAGIAN KIRI: NAMA MEMPELAI (Yang Tadi)
-            ======================================= */}
+                            ======================================= */}
             <div className="absolute inset-y-0 left-0 w-1/3 z-20 flex flex-col justify-center items-center px-4">
-               {/* Badge */}
-               <div className="mb-8 px-6 py-2 bg-[#5D4037]/90 backdrop-blur-md rounded-full border border-[#D7CCC8]/50 shadow-xl">
-                  <p className="font-isi text-[#F1F1E8] tracking-[0.2em] uppercase text-[10px] md:text-xs font-semibold whitespace-nowrap">
+               {/* BADGE "THE WEDDING OF" (KNOCKOUT STYLE - LEBIH BESAR) 
+                   - text-xs md:text-sm : Ukuran font diperbesar (sebelumnya text-[10px]).
+                   - px-10 py-3         : Padding kotak diperbesar biar lega (sebelumnya px-8 py-2).
+               */}
+               <div className="mb-8 px-8 py-2 bg-[#F1F1E8] rounded-full shadow-2xl flex items-center justify-center translate-x-12 transition-transform mix-blend-screen">
+                  <p 
+                     className="font-custom font-semibold text-transpare uppercase text-6xl md:text-sm whitespace-nowrap"
+                     style={{ 
+                        letterSpacing: '0.2em', 
+                        marginRight: '-0.2em' 
+                     }}
+                  >
                      The Wedding of
                   </p>
                </div>
@@ -181,7 +190,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                {/* Nama */}
                <div className="text-center text-[#F1F1E8] drop-shadow-2xl space-y-2">
                   <div className="text-6xl font-isi md:text-7xl xl:text-8xl leading-none">{invitation.groomNick}</div>
-                  <div className="text-3xl font-isi  text-[#D7CCC8]">&</div>
+                  <div className="text-6xl font-isi ">&</div>
                   <div className="text-6xl font-isi md:text-7xl xl:text-8xl leading-none">{invitation.brideNick}</div>
                </div>
             </div>
@@ -200,7 +209,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                   const yy = String(date.getFullYear()).slice(-2);         // 26
 
                   // Style Font Tanggal
-                  const dateStyle = "font-judul text-5xl md:text-6xl text-[#F1F1E8] drop-shadow-lg font-normal";
+                  const dateStyle = "font-custom font-medium  text-5xl md:text-6xl text-[#F1F1E8] drop-shadow-lg font-normal";
                   // Style Garis Pemisah
                   const lineStyle = "w-16 h-[4px] bg-[#D7CCC8] rounded-full";
 
