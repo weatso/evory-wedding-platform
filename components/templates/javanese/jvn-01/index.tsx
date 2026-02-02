@@ -22,50 +22,12 @@ const fontIsi = localFont({
    display: 'swap'
 });
 
-const fontCustomLengkap = localFont({
-  src: [
-    // 1. File Italic (Biasanya dianggap Regular Italic / 400)
-    {
-      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-Italic-VariableFont_wght.ttf',
-      weight: '400', 
-      style: 'italic',
-    },
-    // 2. File ExtraLight -> Gunakan angka 200
-    {
-      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-ExtraLight.ttf',
-      weight: '200', 
-      style: 'normal',
-    },
-    // 3. File Light -> Gunakan angka 300
-    {
-      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-Light.ttf',
-      weight: '300', 
-      style: 'normal',
-    },
-    // 4. File Medium -> Gunakan angka 500
-    // (Catatan: Medium biasanya tegak/normal. Jika file Anda memang miring, biarkan style: italic. Jika tidak, ubah ke normal)
-    {
-      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-Medium.ttf',
-      weight: '500', 
-      style: 'normal', 
-    },
-    // 5. File SemiBold -> Gunakan angka 600
-    {
-      path: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/static/CrimsonPro-SemiBold.ttf',
-      weight: '600', 
-      style: 'normal',
-    },
-  ],
-  variable: '--font-custom', // Cuma butuh 1 variabel untuk semua gaya di atas!
-  display: 'swap',
-});
-
 // BASE URL ASSETS (SVG Default)
 const ASSETS = "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/system-asset/jvn-01";
 
 const COLORS = {
-   primary: "#5D4037",
-   secondary: "#8D6E63",
+   primary: "#818362",
+   secondary: "#AC8E85",
    paper: "#F1F1E8",
 };
 
@@ -140,7 +102,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
    };
 
    return (
-      <div className={`${fontIsi.variable} ${fontJudul.variable} ${fontCustomLengkap.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
+      <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
 
          {/* --- MUSIC PLAYER --- */}
          <button
@@ -154,7 +116,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
              Konsep: Container Relative -> Aset di dalamnya Absolute
          */}
          <div
-            className="fixed inset-y-0 left-0 z-0 hidden lg:block lg:right-[480px] transition-all duration-700 overflow-hidden"
+            className="fixed inset-y-0 left-0 z-0 hidden lg:block lg:right-[420px] transition-all duration-700 overflow-hidden"
             style={{
                // Background Foto/Warna Dasar (dari upload dashboard)
                backgroundImage: `url('${wingsBg}')`,
@@ -165,7 +127,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
          >
 
             {/* 1. Overlay Gelap */}
-            <div className="absolute inset-0 bg-black/20 z-0"></div>
+            <div className="absolute inset-0 z-0"></div>
 
             {/* =======================================
                 BAGIAN KIRI: NAMA MEMPELAI (Yang Tadi)
@@ -177,7 +139,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                */}
                <div className="mb-8 px-8 py-2 bg-[#F1F1E8] rounded-full shadow-2xl flex items-center justify-center translate-x-12 transition-transform mix-blend-screen">
                   <p 
-                     className="font-custom font-semibold text-transpare uppercase text-6xl md:text-sm whitespace-nowrap"
+                     className="font-judul font-semibold -uppercase text-6xl md:text-sm whitespace-nowrap"
                      style={{ 
                         letterSpacing: '0.2em', 
                         marginRight: '-0.2em' 
@@ -250,7 +212,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
             */}
             <img
                src={`${ASSETS}/wing/GradientWings.svg`} // Ganti nama file aset designer Anda
-               className="absolute -top-5 left-0 w-full h-[110%] object-cover opacity-80 z-10 pointer-events-none"
+               className="absolute -top-5 left-0 w-full h-[110%] object-cover z-10 pointer-events-none"
                alt="Ornamen Gradient"
             />
 
@@ -281,7 +243,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
              Ini adalah kertas undangan utama. Backgroundnya terpisah dari Wings.
          */}
          <div
-            className="relative z-10 w-full lg:w-[480px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500"
+            className="relative z-10 w-full lg:w-[420px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500"
             style={{
                backgroundColor: COLORS.paper,
                backgroundImage: `url('${paperBg}')`,
