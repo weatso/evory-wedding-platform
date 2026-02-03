@@ -101,7 +101,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
       });
    };
 
-   return (
+   return (                                                                                                                                                                                                                                                                                                                                                     
       <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
 
          {/* --- MUSIC PLAYER --- */}
