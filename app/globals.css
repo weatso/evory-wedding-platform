@@ -16,9 +16,6 @@
   /* Membuat class: font-isi */
   --font-isi: var(--font-isi);
 
-  /* Membuat class: font-custom */
-  --font-custom: var(--font-custom);
-
   /* --- ANIMASI CUSTOM --- */
   --animate-marquee: marquee 30s linear infinite;
   --animate-float: float 6s ease-in-out infinite;

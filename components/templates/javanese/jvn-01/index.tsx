@@ -67,9 +67,6 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
    // 1. Wings (Desktop Background): Bisa ditimpa foto client
    const wingsBg = themeConfig.desktopBackground || `${ASSETS}/wing/FotoWings.svg`;
 
-   // 2. Paper (Mobile/Content Background): Tetap pattern kertas
-   const paperBg = `${ASSETS}/01-Cover/PATTERN ATAS BACKGROUND.svg`;
-
    useEffect(() => {
       const target = new Date(invitation.eventDate).getTime();
       const interval = setInterval(() => {
@@ -101,8 +98,8 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
       });
    };
 
-   return (                                                                                                                                                                                                                                                                                                                                                     
-      <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900 overflow-x-hidden`}>
+   return (
+      <div className={`${fontIsi.variable} ${fontJudul.variable} font-isi min-h-screen w-full relative bg-stone-900`}>
 
          {/* --- MUSIC PLAYER --- */}
          <button
@@ -132,23 +129,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
             {/* =======================================
                 BAGIAN KIRI: NAMA MEMPELAI (Yang Tadi)
                             ======================================= */}
-            <div className="absolute inset-y-0 left-0 w-1/3 z-20 flex flex-col justify-center items-center px-4">
-               {/* BADGE "THE WEDDING OF" (KNOCKOUT STYLE - LEBIH BESAR) 
-                   - text-xs md:text-sm : Ukuran font diperbesar (sebelumnya text-[10px]).
-                   - px-10 py-3         : Padding kotak diperbesar biar lega (sebelumnya px-8 py-2).
-               */}
-               <div className="mb-8 px-8 py-2 bg-[#F1F1E8] rounded-full shadow-2xl flex items-center justify-center translate-x-12 transition-transform mix-blend-screen">
-                  <p 
-                     className="font-judul font-semibold -uppercase text-6xl md:text-sm whitespace-nowrap"
-                     style={{ 
-                        letterSpacing: '0.2em', 
-                        marginRight: '-0.2em' 
-                     }}
-                  >
-                     The Wedding of
-                  </p>
-               </div>
-
+            <div className="absolute inset-y-0 top-[10%] -left-5 w-1/3 z-20 flex flex-col justify-center items-center px-4">
                {/* Nama */}
                <div className="text-center text-[#F1F1E8] drop-shadow-2xl space-y-2">
                   <div className="text-6xl font-isi md:text-7xl xl:text-8xl leading-none">{invitation.groomNick}</div>
@@ -161,7 +142,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                 BAGIAN KANAN: TANGGAL VERTIKAL (BARU!)
                 Posisi: absolute right-16 (Jarak dari batas kertas undangan)
             ======================================= */}
-            <div className="absolute top-1/2 right-12 -translate-y-1/2 z-20 flex flex-col items-center justify-center space-y-3">
+            <div className="absolute top-1/2 right-7 -translate-y-1/2 z-20 flex flex-col items-center justify-center space-y-1">
 
                {/* LOGIKA FORMAT TANGGAL OTOMATIS */}
                {(() => {
@@ -171,9 +152,9 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                   const yy = String(date.getFullYear()).slice(-2);         // 26
 
                   // Style Font Tanggal
-                  const dateStyle = "font-custom font-medium  text-5xl md:text-6xl text-[#F1F1E8] drop-shadow-lg font-normal";
+                  const dateStyle = "font-judul font-extralight text-[2.5rem] md:text-[2.5rem] text-[#F1F1E8] drop-shadow-lg";
                   // Style Garis Pemisah
-                  const lineStyle = "w-16 h-[4px] bg-[#D7CCC8] rounded-full";
+                  const lineStyle = "w-12 h-[2px] bg-[#D7CCC8]/80 rounded-full";
 
                   return (
                      <>
@@ -212,28 +193,65 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
             */}
             <img
                src={`${ASSETS}/wing/GradientWings.svg`} // Ganti nama file aset designer Anda
-               className="absolute -top-5 left-0 w-full h-[110%] object-cover z-10 pointer-events-none"
+               className="absolute -top-0 left-0 w-[100%] h-[100%] object-cover z-10 pointer-events-none "
                alt="Ornamen Gradient"
             />
 
+            {/* === BADGE "THE WEDDING OF" - TRUE KNOCKOUT ===
+                Diposisikan SETELAH gradient overlay agar mix-blend-screen bekerja
+                dengan benar, membuat teks hitam transparan menembus badge.
+            */}
+            <div
+               className="absolute top-[40%] left-[18%] -translate-y-1/2 -translate-x-1/2 z-20 px-4 py-1 bg-[#F1F1E8] rounded-full shadow-lg flex items-center justify-center mix-blend-screen"
+               style={{ marginTop: '-80px' }}
+            >
+               <p
+                  className="font-judul font-extrabold text-black uppercase text-xs md:text-sm whitespace-nowrap "
+                  style={{
+                     letterSpacing: '0.15em',
+                     marginRight: '-0.15em'
+                  }}
+               >
+                  The Wedding of
+               </p>
+            </div>
+
             {/* ---  ORNAMEN POJOK KIRI ATAS --- */}
             <img
-               src={`${ASSETS}/wing/DaunAtasKiriWings.svg`} // Ganti nama file aset designer Anda
-               className="absolute -top-40 -left-50 w-[35%] h-[35%] opacity-80 z-10 pointer-events-none"
+               src={`${ASSETS}/wing/DaunAtasKiriWings.svg`}
+               className="absolute z-10 pointer-events-none opacity-80"
+               style={{
+                  top: '-15vh',
+                  left: '-5vw',
+                  width: '15vw',
+                  height: '15vw'
+               }}
                alt="Ornamen Atas"
             />
 
             {/* ---  ORNAMEN POJOK KIRI BAWAH --- */}
             <img
                src={`${ASSETS}/wing/DaunKiriBawahWings.svg`}
-               className="absolute -bottom-30 -left-10 w-[25%] h-[25%] opacity-80 z-10 pointer-events-none"
+               className="absolute z-10 pointer-events-none opacity-80"
+               style={{
+                  bottom: '-20vh',
+                  left: '-3vw',
+                  width: '18vw',
+                  height: '18vw'
+               }}
                alt="Ornamen Bawah"
             />
 
             {/* ---  ORNAMEN POJOK KANAN BAWAH --- */}
             <img
                src={`${ASSETS}/wing/DaunKananBawahWings.svg`}
-               className="absolute -bottom-40 -right-10 w-[25%] h-[25%] opacity-80 z-10 pointer-events-none"
+               className="absolute z-10 pointer-events-none opacity-80"
+               style={{
+                  bottom: '-25vh',
+                  right: '-5vw',
+                  width: '20vw',
+                  height: '20vw'
+               }}
                alt="Ornamen Bawah"
             />
          </div>
@@ -243,25 +261,25 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
              Ini adalah kertas undangan utama. Backgroundnya terpisah dari Wings.
          */}
          <div
-            className="relative z-10 w-full lg:w-[420px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500"
+            className="relative z-10 w-full lg:w-[420px] lg:ml-auto min-h-screen shadow-2xl transition-all duration-500 overflow-visible"
             style={{
                backgroundColor: COLORS.paper,
-               backgroundImage: `url('${paperBg}')`,
                backgroundRepeat: 'repeat-y',
                backgroundSize: '100% auto',
                backgroundBlendMode: 'multiply'
             }}
          >
-            <div className="mx-auto max-w-full overflow-hidden pb-10">
+            <div className="mx-auto max-w-full overflow-visible pb-10">
 
                {/* SECTION 1: COVER */}
-               <BaseSectionWrapper id="cover" className="min-h-screen flex flex-col items-center justify-between relative pt-10 px-6">
+               <BaseSectionWrapper id="cover" className="min-h-screen flex flex-col items-center justify-between relative pt-10 overflow-visible">
                   {/* Ornamen SVG Sudut */}
-                  <img src={`${ASSETS}/01-Cover/DAUN KIRI ATAS.svg`} className="absolute top-0 left-0 w-24 md:w-32 z-20 pointer-events-none" alt="" />
-                  <img src={`${ASSETS}/01-Cover/DAUN KANAN ATAS.svg`} className="absolute top-0 right-0 w-24 md:w-32 z-20 pointer-events-none" alt="" />
+                  <img src={`${ASSETS}/01-Cover/DAUN KIRI ATAS.svg`} className="absolute -top-10 -left-5 w-24 md:w-32 z-20 pointer-events-none" alt="" />
+                  <img src={`${ASSETS}/01-Cover/DAUN KANAN ATAS.svg`} className="absolute top-0 -right-10 w-24 md:w-32 z-20 pointer-events-none" alt="" />
+                  <img src={`${ASSETS}/01-Cover/GAPURA.svg`} className="absolute top-[20%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" style={{ width: '120vw', height: 'auto' }} alt="" />
 
                   <div className="z-30 text-center relative mt-12 space-y-4 animate-in fade-in zoom-in duration-1000">
-                     <p className="tracking-[0.2em] text-xs uppercase font-bold text-[#8D6E63] mb-2">The Wedding of</p>
+                     <p className="tracking-[0.2em] text-xs uppercase font-judul font-bold text-[#8D6E63] mb-2">The Wedding of</p>
                      <div className="space-y-0">
                         <h1 className="font-judul text-5xl md:text-6xl font-bold text-[#5D4037] leading-tight">{invitation.groomNick}</h1>
                         <div className="font-serif text-2xl text-[#8D6E63] my-1">&</div>
