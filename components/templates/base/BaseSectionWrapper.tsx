@@ -10,9 +10,9 @@ interface Props {
 
 export default function BaseSectionWrapper({ children, id, className = "", style }: Props) {
   return (
-    <section 
-      id={id} 
-      className={`relative w-full max-w-[400px] mx-auto overflow-hidden px-6 py-16 ${className}`}
+    <section
+      id={id}
+      className={`relative w-full max-w-[420px] mx-auto px-6 py-16 ${className}`}
       style={style}
     >
       {/* - max-w-[400px]: Menjamin lebar panggung utama sesuai SOP.

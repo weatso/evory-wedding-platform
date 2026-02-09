@@ -153,3 +153,30 @@ model Wish {
   guest        Guest?     @relation(fields: [guestId], references: [id])
   createdAt    DateTime   @default(now())
 }
+
+// --- 4. TEMPLATE MANAGEMENT ---
+
+model TemplateCategory {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  items       Template[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Template {
+  id          String           @id @default(cuid())
+  name        String
+  desc        String           // Changed from description to match frontend 'desc'
+  previewText String           // e.g. "JVN"
+  bgColor     String           // e.g. "bg-[#1A1A1A]"
+  textColor   String?          // e.g. "text-amber-500"
+  
+  categoryId  String
+  category    TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
