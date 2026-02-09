@@ -3,13 +3,23 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+// Helper to generate simple slug
+const generateSlug = (text: string) => {
+    return text
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/[\s_-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+};
+
 // --- CATEGORIES ---
 
 export async function getTemplateCategories() {
     try {
         const categories = await prisma.templateCategory.findMany({
             include: {
-                items: {
+                templates: { // Renamed from items
                     orderBy: { createdAt: "desc" }
                 }
             },
@@ -24,9 +34,12 @@ export async function getTemplateCategories() {
 
 export async function createTemplateCategory(data: { title: string; description?: string }) {
     try {
+        const slug = generateSlug(data.title) + "-" + Date.now().toString().slice(-4);
+
         await prisma.templateCategory.create({
             data: {
-                title: data.title,
+                name: data.title, // Schema uses name
+                slug: slug,       // Required in schema
                 description: data.description
             }
         });
@@ -34,6 +47,7 @@ export async function createTemplateCategory(data: { title: string; description?
         revalidatePath("/"); // Update landing page
         return { success: true };
     } catch (error) {
+        console.error("Create Category Error:", error);
         return { success: false, error: "Failed to create category" };
     }
 }
@@ -60,13 +74,17 @@ export async function createTemplate(data: {
     categoryId: string;
 }) {
     try {
+        const slug = generateSlug(data.name) + "-" + Date.now().toString().slice(-4);
+
         await prisma.template.create({
             data: {
                 name: data.name,
-                desc: data.desc,
+                slug: slug,
+                description: data.desc, // Schema uses description
                 previewText: data.previewText,
                 bgColor: data.bgColor,
                 textColor: data.textColor,
+                thumbnail: "https://placehold.co/400x600/1a1a1a/FFF?text=Preview", // Required in schema, placeholder for now
                 categoryId: data.categoryId
             }
         });
@@ -74,6 +92,7 @@ export async function createTemplate(data: {
         revalidatePath("/");
         return { success: true };
     } catch (error) {
+        console.error("Create Template Error:", error);
         return { success: false, error: "Failed to create template" };
     }
 }

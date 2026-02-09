@@ -9,17 +9,17 @@ import PhoneFrame from "./PhoneFrame";
 export interface TemplateItem {
     id: string;
     name: string;
-    desc: string;
-    previewText: string;
-    bgColor: string; // Background color for the phone screen
-    textColor?: string;
+    description: string | null;
+    previewText: string | null; // Nullable in schema
+    bgColor: string | null; // Nullable in schema
+    textColor: string | null;
 }
 
 export interface TemplateCategory {
     id: string;
-    title: string; // e.g. "TRADITIONAL SERIES"
-    description: string; // Generic description for the category
-    items: TemplateItem[];
+    name: string; // Renamed from title
+    description: string | null;
+    templates: TemplateItem[]; // Renamed from items
 }
 
 interface TemplateSectionProps {
@@ -31,7 +31,9 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
     const [activeIndex, setActiveIndex] = useState(0);
     const carouselRef = useRef<HTMLDivElement>(null);
 
-    const activeTemplate = category.items[activeIndex];
+    // Fallback if templates is empty
+    const templates = category.templates || [];
+    const activeTemplate = templates[activeIndex];
 
     // Handle Carousel Scroll
     const scrollToIndex = (idx: number) => {
@@ -51,11 +53,13 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
             const width = carouselRef.current.clientWidth;
             const scrollPos = carouselRef.current.scrollLeft;
             const newIndex = Math.round(scrollPos / width);
-            if (newIndex !== activeIndex && newIndex >= 0 && newIndex < category.items.length) {
+            if (newIndex !== activeIndex && newIndex >= 0 && newIndex < templates.length) {
                 setActiveIndex(newIndex);
             }
         }
     };
+
+    if (!activeTemplate) return null; // Safety check
 
     return (
         <section className="min-h-screen w-full flex flex-col lg:flex-row items-center justify-center p-6 lg:p-24 border-b border-white/5 relative">
@@ -76,14 +80,14 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
                             className="absolute inset-0 flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
                             style={{ scrollBehavior: 'smooth' }}
                         >
-                            {category.items.map((item, i) => (
+                            {templates.map((item, i) => (
                                 <div
                                     key={item.id}
-                                    className={`w-full h-full flex-shrink-0 flex flex-col items-center justify-center snap-center relative ${item.bgColor}`}
-                                    onClick={() => scrollToIndex((i + 1) % category.items.length)} // Simple tap to next for UX
+                                    className={`w-full h-full flex-shrink-0 flex flex-col items-center justify-center snap-center relative ${item.bgColor || 'bg-black'}`}
+                                    onClick={() => scrollToIndex((i + 1) % templates.length)} // Simple tap to next for UX
                                 >
                                     <h3 className={`text-4xl lg:text-5xl font-serif font-bold opacity-30 ${item.textColor || 'text-white'}`}>
-                                        {item.previewText}
+                                        {item.previewText || 'TPL'}
                                     </h3>
                                     <p className={`mt-4 text-[10px] uppercase tracking-widest font-semibold opacity-60 ${item.textColor || 'text-white'}`}>
                                         {item.name}
@@ -94,7 +98,7 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
 
                         {/* Carousel Indicators Inside Phone */}
                         <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-30">
-                            {category.items.map((_, i) => (
+                            {templates.map((_, i) => (
                                 <div
                                     key={i}
                                     className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === activeIndex ? 'bg-white w-4' : 'bg-white/30'}`}
@@ -116,7 +120,7 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
                 <div className="mb-2 flex items-center gap-3">
                     <span className="h-px w-8 bg-evory-gold"></span>
                     <span className="text-evory-gold text-xs tracking-[0.2em] uppercase font-bold">
-                        {category.title}
+                        {category.name}
                     </span>
                 </div>
 
@@ -127,7 +131,7 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
                             {activeTemplate.name}
                         </h2>
                         <p className="text-gray-400 text-sm lg:text-lg leading-relaxed font-light mb-8 max-w-md">
-                            {activeTemplate.desc}
+                            {activeTemplate.description}
                         </p>
 
                         <div className="flex flex-wrap gap-4">
@@ -142,7 +146,7 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
                                     variant="ghost"
                                     size="icon"
                                     className="rounded-full border border-white/10 hover:bg-white/10"
-                                    onClick={() => scrollToIndex(activeIndex === 0 ? category.items.length - 1 : activeIndex - 1)}
+                                    onClick={() => scrollToIndex(activeIndex === 0 ? templates.length - 1 : activeIndex - 1)}
                                 >
                                     <ArrowLeft size={16} />
                                 </Button>
@@ -150,7 +154,7 @@ export default function TemplateSection({ category, index }: TemplateSectionProp
                                     variant="ghost"
                                     size="icon"
                                     className="rounded-full border border-white/10 hover:bg-white/10"
-                                    onClick={() => scrollToIndex((activeIndex + 1) % category.items.length)}
+                                    onClick={() => scrollToIndex((activeIndex + 1) % templates.length)}
                                 >
                                     <ArrowRight size={16} />
                                 </Button>

@@ -8,7 +8,7 @@ export default async function LandingPage() {
   // FETCH DATA DYNAMICALLY
   const categories = await prisma.templateCategory.findMany({
     include: {
-      items: {
+      templates: { // Changed from items
         orderBy: { createdAt: "desc" }
       }
     },
@@ -16,7 +16,7 @@ export default async function LandingPage() {
   });
 
   // Extract all template names for Marquee
-  const allTemplates = categories.flatMap(c => c.items);
+  const allTemplates = categories.flatMap(c => c.templates); // Changed from items
 
   return (
     // 'snap-y snap-mandatory' active on the root container for full page section snapping

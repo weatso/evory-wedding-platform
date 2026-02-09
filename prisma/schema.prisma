@@ -7,10 +7,13 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // directUrl dihapus karena Anda tidak memilikinya
+  // directUrl dihapus karena Anda menggunakan Database Standar
 }
 
-// --- 1. ENUMS (WAJIB ADA UNTUK MENGATASI ERROR P1012) ---
+// ==========================================
+// 1. ENUMS (Tipe Data Tetap)
+// ==========================================
+
 enum UserRole {
   ADMIN
   CLIENT
@@ -23,7 +26,10 @@ enum RsvpStatus {
   DECLINED
 }
 
-// --- 2. AUTH MODELS (NextAuth Adapter) ---
+// ==========================================
+// 2. AUTH MODELS (NextAuth / Auth.js)
+// ==========================================
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -35,25 +41,27 @@ model User {
   
   accounts      Account[]
   sessions      Session[]
+  
+  // Relasi ke Invitation (Satu user bisa punya banyak undangan, misal: Resepsi Jakarta & Bali)
   invitations   Invitation[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String? @db.Text
-  access_token       String? @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String? @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -76,42 +84,47 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- 3. BUSINESS MODELS ---
+// ==========================================
+// 3. BUSINESS MODELS (Undangan & Tamu)
+// ==========================================
 
 model Invitation {
   id            String   @id @default(cuid())
-  slug          String   @unique
-  templateId    String   @default("jvn-01")
+  slug          String   @unique // URL Undangan: evory.com/slug
   isActive      Boolean  @default(true)
-
-  // Data Mempelai
+  
+  // Template yang dipakai (Relasi ke Model Template)
+  templateId    String?  // Opsional dulu, nanti diisi slug template (misal: "jvn-01")
+  
+  // --- DATA MEMPELAI ---
   groomName     String
   groomNick     String
-  groomImageUrl String?
   groomFather   String?
   groomMother   String?
+  groomImageUrl String?
   
   brideName     String
   brideNick     String
-  brideImageUrl String?
   brideFather   String?
   brideMother   String?
+  brideImageUrl String?
   
-  // Data Acara
+  // --- DATA ACARA ---
   eventDate     DateTime
   eventTime     String   @default("08:00 WIB - Selesai")
   location      String
   mapUrl        String?
   
-  // Aset & Config
+  // --- ASET DIGITAL & KONFIGURASI ---
   coverImageUrl String?
   musicUrl      String?
-  gallery       String[] // Array URL
-  themeConfig   Json?
-
-  // Relasi
+  gallery       String[] // Array URL Foto Gallery
+  themeConfig   Json?    // Simpan warna/font custom disini
+  
+  // --- RELASI ---
   userId        String?
   user          User?    @relation(fields: [userId], references: [id])
+  
   guests        Guest[]
   wishes        Wish[]
 
@@ -123,21 +136,26 @@ model Invitation {
 
 model Guest {
   id                String     @id @default(cuid())
-  invitationId      String
-  invitation        Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   
+  // Identitas Tamu
   name              String
-  category          String?    
-  guestCode         String     @unique 
-  whatsapp          String?    
+  category          String?    // VIP, Keluarga, Teman Kantor
+  guestCode         String     @unique // Kode unik QR Code (misal: G-12345)
+  whatsapp          String?
   
+  // RSVP & Kehadiran
   rsvpStatus        RsvpStatus @default(PENDING)
-  pax               Int        @default(1) 
-  totalPaxAllocated Int        @default(1) // Field Baru (Pengganti maxPax)
-
+  pax               Int        @default(1) // Jumlah tamu yang akan datang (Konfirmasi RSVP)
+  totalPaxAllocated Int        @default(1) // Jatah kuota undangan (Max Pax)
+  
+  // Check-In (Buku Tamu Digital)
   isCheckedIn       Boolean    @default(false)
   checkInTime       DateTime?
 
+  // Relasi
+  invitationId      String
+  invitation        Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  
   wishes            Wish[]
 
   createdAt         DateTime   @default(now())
@@ -147,20 +165,28 @@ model Guest {
 model Wish {
   id           String     @id @default(cuid())
   message      String     @db.Text
+  senderName   String?    // Nama pengirim (jika guest tidak login)
+  
   invitationId String
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  
   guestId      String?
   guest        Guest?     @relation(fields: [guestId], references: [id])
+  
   createdAt    DateTime   @default(now())
 }
 
-// --- 4. TEMPLATE MANAGEMENT ---
+// ==========================================
+// 4. TEMPLATE MANAGEMENT (Katalog Desain)
+// ==========================================
 
 model TemplateCategory {
   id          String     @id @default(cuid())
-  title       String
+  name        String     // Javanese, Modern, Minimalist
+  slug        String     @unique // javanese-series
   description String?
-  items       Template[]
+  
+  templates   Template[] // Relasi One-to-Many
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -168,12 +194,22 @@ model TemplateCategory {
 
 model Template {
   id          String           @id @default(cuid())
-  name        String
-  desc        String           // Changed from description to match frontend 'desc'
-  previewText String           // e.g. "JVN"
-  bgColor     String           // e.g. "bg-[#1A1A1A]"
-  textColor   String?          // e.g. "text-amber-500"
+  name        String           // Jvn-01 (Kraton)
+  slug        String           @unique // jvn-01 (Ini yang dipakai di URL)
+  description String?          // Deskripsi singkat
   
+  // Tampilan di Katalog (Frontend)
+  thumbnail   String           // URL Gambar Preview
+  previewUrl  String?          // Link Demo Undangan
+  previewText String?          // Teks singkatan (JVN)
+  bgColor     String?          // Kode warna bg (bg-stone-900)
+  textColor   String?          // Kode warna text (text-gold)
+
+  // Status
+  isActive    Boolean          @default(true)
+  isPremium   Boolean          @default(false)
+  
+  // Relasi
   categoryId  String
   category    TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   
