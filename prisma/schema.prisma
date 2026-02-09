@@ -93,8 +93,8 @@ model Invitation {
   slug          String   @unique // URL Undangan: evory.com/slug
   isActive      Boolean  @default(true)
   
-  // Template yang dipakai (Relasi ke Model Template)
-  templateId    String?  // Opsional dulu, nanti diisi slug template (misal: "jvn-01")
+  templateId  String?
+  template    Template? @relation(fields: [templateId], references: [id])
   
   // --- DATA MEMPELAI ---
   groomName     String
@@ -197,6 +197,8 @@ model Template {
   name        String           // Jvn-01 (Kraton)
   slug        String           @unique // jvn-01 (Ini yang dipakai di URL)
   description String?          // Deskripsi singkat
+
+  invitations Invitation[]
   
   // Tampilan di Katalog (Frontend)
   thumbnail   String           // URL Gambar Preview
