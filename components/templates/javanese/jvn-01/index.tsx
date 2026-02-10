@@ -1,29 +1,25 @@
 "use client";
 
 import { submitRsvp } from "@/app/invitation/actions";
-// Jika hook ini belum ada, buat file hooks/useAudio.ts atau komen dulu baris ini
-import { useAudio } from "@/hooks/useAudio"; 
-import { WeddingTemplateProps } from "@/components/templates/registry"; 
+import { WeddingTemplateProps } from "@/components/templates/registry";
+import { useAudio } from "@/hooks/useAudio";
 import { CalendarCheck, MapPin, Music, Pause } from "lucide-react";
-import localFont from 'next/font/local'; // KEMBALI KE LOKAL
+import localFont from 'next/font/local';
 import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
-// Pastikan path ini benar sesuai struktur folder Anda
-import BaseSectionWrapper from "../../base/BaseSectionWrapper"; 
+import BaseSectionWrapper from "../../base/BaseSectionWrapper";
 
-// --- 1. KONFIGURASI FONT LOKAL (SESUAI PILIHAN DESAINER) ---
-// Pastikan file .ttf ada di folder public yang Anda tuju
-const fontJudul = localFont({
-   src: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf',
-   variable: '--font-judul',
-   display: 'swap'
-});
-
+// --- 1. KONFIGURASI FONT LOKAL ---
 const fontIsi = localFont({
-   src: '../../../../public/templates/javanese/jvn-01/fonts/lt_perfume/LTPerfume-2.ttf',
+   src: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf',
    variable: '--font-isi',
-   display: 'swap'
 });
+
+const fontJudul = localFont({
+   src: '../../../../public/templates/javanese/jvn-01/fonts/lt_perfume/LTPerfume-2.ttf',
+   variable: '--font-judul',
+});
+
 
 // BASE URL ASSETS (ORIGINAL)
 const ASSETS = "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/system-asset/jvn-01";
@@ -36,9 +32,9 @@ const COLORS = {
 
 // TIPE DATA LOVE STORY
 type LoveStory = {
-  year: string;
-  title: string;
-  story: string;
+   year: string;
+   title: string;
+   story: string;
 };
 
 // HELPER: Google Calendar
@@ -64,24 +60,24 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
    // --- LOGIC DATA ---
    // Saat ini Guest masih null karena kita akses lewat link umum /invitation/[slug]
    // Nanti kita update di sesi berikutnya untuk fitur Link Tamu Unik
-   const guest = null; 
-   
+   const guest = null;
+
    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
    const [isPending, startTransition] = useTransition();
-   const [rsvpForm, setRsvpForm] = useState({ 
-   name: "",       // <--- TAMBAHKAN INI (PENTING!)
-   attendance: "ATTENDING", 
-   message: "" 
-});
+   const [rsvpForm, setRsvpForm] = useState({
+      name: "",       // <--- TAMBAHKAN INI (PENTING!)
+      attendance: "ATTENDING",
+      message: ""
+   });
 
    // AUDIO PLAYER
    // Pastikan file MP3 ada di public/music/javanese/Cinta.mp3
    // Jika hook useAudio error, komen baris ini dan gunakan dummy di bawahnya
    const { playing, toggle } = useAudio("/music/javanese/Cinta.mp3", 0.3);
-   
+
    // DATA: Love Story (Ambil dari DB atau Default)
    // Menggunakan 'as any' sementara karena schema prisma themeConfig berbentuk JSON
-   const themeConfig = (invitation as any).themeConfig || {}; 
+   const themeConfig = (invitation as any).themeConfig || {};
    const loveStories = (themeConfig.loveStories as LoveStory[]) || [
       { year: "2022", title: "Pertemuan Pertama", story: "Kami bertemu di sebuah kedai kopi kecil..." },
       { year: "2024", title: "Lamaran", story: "Di bawah langit senja, dia memberanikan diri..." }
@@ -111,7 +107,7 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
    // --- FUNGSI SUBMIT BARU ---
    const handleRsvpSubmit = async () => {
       if (!rsvpForm.name) return alert("Mohon isi nama Anda.");
-      
+
       startTransition(async () => {
          // Panggil Server Action
          const result = await submitRsvp(
@@ -144,7 +140,7 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
 
          {/* --- LAYER 0: WINGS AREA (KIRI) --- */}
          <div className="fixed inset-y-0 left-0 z-0 hidden md:block w-[calc(100%-420px)] lg:right-[420px] transition-all duration-700 overflow-hidden bg-[#AC8E85]">
-            
+
             {/* DESKTOP LAYOUT (XL+) */}
             <div className="hidden xl:block absolute inset-0 w-full h-full">
                <div
@@ -326,7 +322,7 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
                      <div>
                         <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.groomName}</h3>
                         <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">
-                           Putra Bpk. {invitation.groomFather || "..."} <br/> & Ibu {invitation.groomMother || "..."}
+                           Putra Bpk. {invitation.groomFather || "..."} <br /> & Ibu {invitation.groomMother || "..."}
                         </p>
                      </div>
                   </div>
@@ -339,7 +335,7 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
                      <div>
                         <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.brideName}</h3>
                         <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">
-                           Putri Bpk. {invitation.brideFather || "..."} <br/> & Ibu {invitation.brideMother || "..."}
+                           Putri Bpk. {invitation.brideFather || "..."} <br /> & Ibu {invitation.brideMother || "..."}
                         </p>
                      </div>
                   </div>
@@ -417,26 +413,26 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
                <BaseSectionWrapper id="rsvp" className="text-center py-16 px-6 md:ml-auto md:mr-0">
                   <h3 className="font-judul font-bold text-[#5D4037] mb-2 text-2xl">Buku Tamu</h3>
                   <div className="bg-white p-6 rounded-xl border border-[#D7CCC8] shadow-sm text-left space-y-4">
-                     
+
                      {/* INPUT NAMA (Sekarang Bisa Diedit) */}
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Nama Lengkap</label>
-                        <input 
-                           type="text" 
-                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none" 
-                           value={rsvpForm.name} 
-                           onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})}
+                        <input
+                           type="text"
+                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none"
+                           value={rsvpForm.name}
+                           onChange={(e) => setRsvpForm({ ...rsvpForm, name: e.target.value })}
                            placeholder="Masukkan Nama Anda"
-                           // disabled dihapus agar bisa diedit
+                        // disabled dihapus agar bisa diedit
                         />
                      </div>
 
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Kehadiran</label>
-                        <select 
-                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none" 
-                           value={rsvpForm.attendance} 
-                           onChange={(e) => setRsvpForm({ ...rsvpForm, attendance: e.target.value })} 
+                        <select
+                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none"
+                           value={rsvpForm.attendance}
+                           onChange={(e) => setRsvpForm({ ...rsvpForm, attendance: e.target.value })}
                         >
                            <option value="ATTENDING">Hadir</option>
                            <option value="DECLINED">Berhalangan</option>
@@ -445,17 +441,17 @@ export default function Jvn01({ invitation }: WeddingTemplateProps) {
 
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Ucapan & Doa</label>
-                        <textarea 
-                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24" 
-                           placeholder="Tulis ucapan selamat..." 
-                           value={rsvpForm.message} 
-                           onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })} 
+                        <textarea
+                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24"
+                           placeholder="Tulis ucapan selamat..."
+                           value={rsvpForm.message}
+                           onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })}
                         />
                      </div>
 
-                     <button 
-                        onClick={handleRsvpSubmit} 
-                        disabled={isPending} 
+                     <button
+                        onClick={handleRsvpSubmit}
+                        disabled={isPending}
                         className="w-full bg-[#5D4037] text-white py-3 rounded-lg font-bold mt-2 shadow hover:bg-[#4E342E] transition disabled:opacity-50"
                      >
                         {isPending ? "Mengirim..." : "Kirim Konfirmasi"}
