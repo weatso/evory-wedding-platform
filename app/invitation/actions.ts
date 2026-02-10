@@ -3,9 +3,8 @@
 import { prisma } from "@/lib/prisma"; // Pastikan path ini benar (bisa @/lib/db)
 import { revalidatePath } from "next/cache";
 
-// Helper sederhana untuk bikin kode unik acak
+// Helper sederhana untuk bikin kode unik acak (Format: PUB-XXXXXX)
 function generateGuestCode() {
-  // Format: PUB- (Public) + 6 karakter acak
   return `PUB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 }
 
@@ -29,7 +28,7 @@ export async function submitRsvp(
     // 2. LOGIKA DATABASE (TRANSACTION)
     await prisma.$transaction(async (tx) => {
       
-      // KASUS A: TAMU LAMA (Punya ID Unik dari Link)
+      // KASUS A: TAMU LAMA (Punya ID Unik dari Link) -> Logic Kode Lama Anda
       if (guestId) {
         const existingGuest = await tx.guest.findUnique({
           where: { id: guestId }
@@ -37,12 +36,13 @@ export async function submitRsvp(
 
         if (!existingGuest) throw new Error("Data tamu tidak ditemukan.");
 
-        // Update data tamu
+        // Update data tamu (Hanya update status & pax, tidak perlu guestCode baru)
         await tx.guest.update({
           where: { id: guestId },
           data: {
             rsvpStatus: status,
             pax: status === "ATTENDING" ? existingGuest.totalPaxAllocated : 0,
+            isCheckedIn: status === "ATTENDING" ? undefined : false,
             // Update nama jika user mengeditnya
             name: name && name !== existingGuest.name ? name : undefined, 
           }
@@ -50,14 +50,14 @@ export async function submitRsvp(
         finalGuestId = guestId;
       } 
       
-      // KASUS B: TAMU BARU (Publik / Link Umum)
+      // KASUS B: TAMU BARU (Publik / Link Umum) -> Logic Baru
       else {
-        // Buat Guest Baru
+        // Kita WAJIB generate guestCode karena di Schema Prisma field ini Required
         const newGuest = await tx.guest.create({
           data: {
             invitationId: invitationId,
             name: name,
-            guestCode: generateGuestCode(), // <--- PERBAIKAN: Generate kode unik
+            guestCode: generateGuestCode(), // <--- SOLUSI ERROR: Generate kode unik
             category: "Public", 
             rsvpStatus: status, 
             totalPaxAllocated: 1, // Default 1 orang
@@ -74,7 +74,6 @@ export async function submitRsvp(
             message: message.trim(),
             guestId: finalGuestId,
             invitationId: invitationId,
-            // name tidak perlu disimpan di wish karena relasi ke guest sudah ada
           }
         });
       }

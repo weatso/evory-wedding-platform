@@ -1,9 +1,9 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import GuestForm from "../GuestForm"; // Import dari folder dashboard
-import GuestRowActions from "../GuestRowActions"; // Import dari folder dashboard
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import GuestForm from "../GuestForm";
+import GuestRowActions from "../GuestRowActions";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
 
@@ -25,7 +25,7 @@ export default async function GuestsPage(props: Props) {
     include: { guests: { orderBy: { createdAt: 'desc' } } },
   });
 
-  if (!invitation) return <div>Data tidak ditemukan</div>;
+  if (!invitation) return <div>Data tidak ditemukan. Silakan buat undangan terlebih dahulu.</div>;
 
   return (
     <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -39,7 +39,7 @@ export default async function GuestsPage(props: Props) {
             </div>
             <div className="p-4 bg-blue-50 text-blue-800 rounded-lg text-xs border border-blue-100">
                 <p className="font-bold mb-1">💡 Tips:</p>
-                Setelah tamu disimpan, kirim link undangan via WhatsApp.
+                Setelah tamu disimpan, kirim link undangan via WhatsApp agar nama mereka otomatis muncul.
             </div>
         </div>
 
@@ -93,7 +93,8 @@ export default async function GuestsPage(props: Props) {
                                             {g.totalPaxAllocated}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <GuestRowActions guest={g} />
+                                            {/* PERBAIKAN: Kirim SLUG ke sini */}
+                                            <GuestRowActions guest={g} invitationSlug={invitation.slug} />
                                         </td>
                                     </tr>
                                 ))}

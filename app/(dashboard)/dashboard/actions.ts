@@ -1,17 +1,22 @@
-'use server';
+"use server";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db"; // Sesuaikan path db Anda
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-// Schema Validasi (Guest Code digenerate server, jadi tidak perlu divalidasi dari input)
+// Schema Validasi
 const GuestSchema = z.object({
   name: z.string().min(1, "Nama tamu wajib diisi"),
-  whatsapp: z.string().optional().or(z.literal("")), // Boleh kosong
+  whatsapp: z.string().optional().or(z.literal("")),
   category: z.string().optional(),
   totalPaxAllocated: z.coerce.number().min(1, "Minimal 1 orang").default(1),
 });
+
+// Helper Generate Kode Unik
+function generateGuestCode() {
+  return Math.random().toString(36).substring(2, 6).toUpperCase();
+}
 
 // 1. TAMBAH TAMU
 export async function addGuest(invitationId: string, formData: FormData) {
@@ -33,25 +38,20 @@ export async function addGuest(invitationId: string, formData: FormData) {
 
   const { name, whatsapp, category, totalPaxAllocated } = validated.data;
 
-  // GENERATE KODE UNIK (Server Side)
-  // Format: 4 karakter acak (A-Z, 0-9)
-  const guestCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-
   try {
     await prisma.guest.create({
       data: {
-        invitationId, // ID Undangan dikirim dari param, bukan hidden input (lebih aman)
+        invitationId,
         name,
-        whatsapp: whatsapp || "", // Handle null
+        whatsapp: whatsapp || "",
         category: category || "Regular",
-        guestCode,
+        guestCode: generateGuestCode(), // Generate otomatis
         totalPaxAllocated,
         rsvpStatus: "PENDING",
       },
     });
 
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/live");
+    revalidatePath("/dashboard/guests"); // Pastikan path ini benar sesuai struktur folder
     return { success: true };
 
   } catch (error) {
@@ -66,14 +66,11 @@ export async function deleteGuest(guestId: string) {
   if (!session?.user?.id) return { error: "Unauthorized" };
 
   try {
-    // Security: Cek kepemilikan
     const guest = await prisma.guest.findUnique({
       where: { id: guestId },
       include: { invitation: true },
     });
 
-    // Jika tamu tidak ada ATAU bukan milik user ini -> TOLAK
-    // Note: Admin boleh hapus punya siapa saja
     const isOwner = guest?.invitation.userId === session.user.id;
     const isAdmin = session.user.role === "ADMIN";
 
@@ -83,17 +80,14 @@ export async function deleteGuest(guestId: string) {
 
     await prisma.guest.delete({ where: { id: guestId } });
 
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/live");
+    revalidatePath("/dashboard/guests");
     return { success: true };
   } catch (error) {
     return { error: "Gagal menghapus tamu." };
   }
 }
 
-// 3. UPDATE TAMU (BARU)
-// 3. UPDATE TAMU (BARU)
-// Menerima object biasa karena dipanggil via Client Component (bukan <form>)
+// 3. UPDATE TAMU
 export async function updateGuest(guestId: string, payload: {
   name: string;
   whatsapp?: string | null;
@@ -103,31 +97,18 @@ export async function updateGuest(guestId: string, payload: {
   const session = await auth();
   if (!session?.user?.id) return { error: "Unauthorized" };
 
-  // Normalisasi input untuk Zod (ubah null jadi undefined atau empty string)
-  const rawData = {
-    name: payload.name,
-    whatsapp: payload.whatsapp ?? "",
-    category: payload.category ?? "Regular",
-    totalPaxAllocated: payload.totalPaxAllocated,
-  };
-
-  const validated = GuestSchema.safeParse(rawData);
-  if (!validated.success) return { error: "Data edit tidak valid." };
-
   try {
-    // Cek Security (Opsional: bisa query dulu seperti deleteGuest)
-
     await prisma.guest.update({
       where: { id: guestId },
       data: {
-        name: validated.data.name,
-        whatsapp: validated.data.whatsapp || "",
-        category: validated.data.category,
-        totalPaxAllocated: validated.data.totalPaxAllocated,
+        name: payload.name,
+        whatsapp: payload.whatsapp || "",
+        category: payload.category || "Regular",
+        totalPaxAllocated: payload.totalPaxAllocated,
       }
     });
 
-    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/guests");
     return { success: true };
   } catch (error) {
     return { error: "Gagal update data." };
