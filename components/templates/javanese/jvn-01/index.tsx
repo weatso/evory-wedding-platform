@@ -1,15 +1,18 @@
 "use client";
 
 import { submitRsvp } from "@/app/invitation/actions";
-import { useAudio } from "@/hooks/useAudio";
-import { LoveStory, WeddingTemplateProps } from "@/types/template";
+// Jika hook ini belum ada, buat file hooks/useAudio.ts atau komen dulu baris ini
+import { useAudio } from "@/hooks/useAudio"; 
+import { WeddingTemplateProps } from "@/components/templates/registry"; 
 import { CalendarCheck, MapPin, Music, Pause } from "lucide-react";
-import localFont from 'next/font/local';
+import localFont from 'next/font/local'; // KEMBALI KE LOKAL
 import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
-import BaseSectionWrapper from "../../base/BaseSectionWrapper";
+// Pastikan path ini benar sesuai struktur folder Anda
+import BaseSectionWrapper from "../../base/BaseSectionWrapper"; 
 
-// --- 1. KONFIGURASI FONT ---
+// --- 1. KONFIGURASI FONT LOKAL (SESUAI PILIHAN DESAINER) ---
+// Pastikan file .ttf ada di folder public yang Anda tuju
 const fontJudul = localFont({
    src: '../../../../public/templates/javanese/jvn-01/fonts/Crimson_Pro/CrimsonPro-VariableFont_wght.ttf',
    variable: '--font-judul',
@@ -22,7 +25,7 @@ const fontIsi = localFont({
    display: 'swap'
 });
 
-// BASE URL ASSETS (SVG Default)
+// BASE URL ASSETS (ORIGINAL)
 const ASSETS = "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/system-asset/jvn-01";
 
 const COLORS = {
@@ -31,8 +34,16 @@ const COLORS = {
    paper: "#F1F1E8",
 };
 
+// TIPE DATA LOVE STORY
+type LoveStory = {
+  year: string;
+  title: string;
+  story: string;
+};
+
 // HELPER: Google Calendar
 const generateGoogleCalendar = (invitation: any) => {
+   if (!invitation.eventDate) return "#";
    const date = new Date(invitation.eventDate);
    const start = date.toISOString().replace(/-|:|\.\d+/g, "");
    const endDate = new Date(date.getTime() + 2 * 60 * 60 * 1000);
@@ -44,30 +55,43 @@ const generateGoogleCalendar = (invitation: any) => {
 // KOMPONEN: Frame Foto
 const GalleryFrame = ({ src, alt, className }: { src: string, alt: string, className?: string }) => (
    <div className={`relative overflow-hidden rounded-xl shadow-md bg-stone-200 ${className}`}>
-      <Image src={src} alt={alt} fill className="object-cover transition-transform duration-700 hover:scale-110" sizes="(max-width: 768px) 100vw, 33vw" />
+      {/* Menggunakan unoptimized karena gambar dari URL eksternal (Supabase) */}
+      <Image src={src} alt={alt} fill className="object-cover transition-transform duration-700 hover:scale-110" sizes="(max-width: 768px) 100vw, 33vw" unoptimized />
    </div>
 );
 
-export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
+export default function Jvn01({ invitation }: WeddingTemplateProps) {
+   // --- LOGIC DATA ---
+   // Saat ini Guest masih null karena kita akses lewat link umum /invitation/[slug]
+   // Nanti kita update di sesi berikutnya untuk fitur Link Tamu Unik
+   const guest = null; 
+   
    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
    const [isPending, startTransition] = useTransition();
-   const [rsvpForm, setRsvpForm] = useState({ attendance: "ATTENDING", message: "" });
+   const [rsvpForm, setRsvpForm] = useState({ 
+   name: "",       // <--- TAMBAHKAN INI (PENTING!)
+   attendance: "ATTENDING", 
+   message: "" 
+});
 
-   // AUDIO: Default 'daylight.mp3'
+   // AUDIO PLAYER
+   // Pastikan file MP3 ada di public/music/javanese/Cinta.mp3
+   // Jika hook useAudio error, komen baris ini dan gunakan dummy di bawahnya
    const { playing, toggle } = useAudio("/music/javanese/Cinta.mp3", 0.3);
-
+   
    // DATA: Love Story (Ambil dari DB atau Default)
-   const themeConfig = invitation.themeConfig as any || {};
-   const loveStories = themeConfig.loveStories as LoveStory[] || [
+   // Menggunakan 'as any' sementara karena schema prisma themeConfig berbentuk JSON
+   const themeConfig = (invitation as any).themeConfig || {}; 
+   const loveStories = (themeConfig.loveStories as LoveStory[]) || [
       { year: "2022", title: "Pertemuan Pertama", story: "Kami bertemu di sebuah kedai kopi kecil..." },
       { year: "2024", title: "Lamaran", story: "Di bawah langit senja, dia memberanikan diri..." }
    ];
 
    // LOGIC BACKGROUND (WINGS vs PAPER)
-   // 1. Wings (Desktop Background): Bisa ditimpa foto client
    const wingsBg = themeConfig.desktopBackground || `${ASSETS}/wing/FotoWings.svg`;
 
    useEffect(() => {
+      if (!invitation.eventDate) return;
       const target = new Date(invitation.eventDate).getTime();
       const interval = setInterval(() => {
          const now = new Date().getTime();
@@ -84,16 +108,25 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
       return () => clearInterval(interval);
    }, [invitation.eventDate]);
 
+   // --- FUNGSI SUBMIT BARU ---
    const handleRsvpSubmit = async () => {
-      if (!guest) return alert("Fitur RSVP hanya untuk tamu undangan.");
+      if (!rsvpForm.name) return alert("Mohon isi nama Anda.");
+      
       startTransition(async () => {
-         try {
-            await submitRsvp(guest.id, rsvpForm.attendance as "ATTENDING" | "DECLINED", rsvpForm.message);
-            alert("Konfirmasi terkirim! Terima kasih.");
-            setRsvpForm(prev => ({ ...prev, message: "" }));
-         } catch (error) {
-            console.error(error);
-            alert("Gagal mengirim data.");
+         // Panggil Server Action
+         const result = await submitRsvp(
+            invitation.id,
+            null, // null = Tamu Umum
+            rsvpForm.name,
+            rsvpForm.attendance as "ATTENDING" | "DECLINED",
+            rsvpForm.message
+         );
+
+         if (result.success) {
+            alert("Konfirmasi & Ucapan berhasil dikirim! Terima kasih.");
+            setRsvpForm({ name: "", attendance: "ATTENDING", message: "" }); // Reset Form
+         } else {
+            alert("Gagal mengirim data. Silakan coba lagi.");
          }
       });
    };
@@ -109,13 +142,10 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
             {playing ? <Pause className="text-white w-5 h-5" /> : <Music className="text-white w-5 h-5" />}
          </button>
 
-         {/* --- LAYER 0: WINGS AREA (KIRI) DENGAN ORNAMEN --- 
-             Konsep: Container Relative -> Aset di dalamnya Absolute
-         */}
-         <div
-            className="fixed inset-y-0 left-0 z-0 hidden md:block w-[calc(100%-420px)] lg:right-[420px] transition-all duration-700 overflow-hidden bg-[#AC8E85]"
-         >
-            {/* DESKTOP LAYOUT (XL+): Full Background Image + Split Layout */}
+         {/* --- LAYER 0: WINGS AREA (KIRI) --- */}
+         <div className="fixed inset-y-0 left-0 z-0 hidden md:block w-[calc(100%-420px)] lg:right-[420px] transition-all duration-700 overflow-hidden bg-[#AC8E85]">
+            
+            {/* DESKTOP LAYOUT (XL+) */}
             <div className="hidden xl:block absolute inset-0 w-full h-full">
                <div
                   className="absolute inset-0"
@@ -165,7 +195,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                   alt="Ornamen Gradient"
                />
 
-               {/* Badge (Center-Left) */}
+               {/* Badge */}
                <div
                   className="absolute top-[40%] left-[18%] -translate-y-1/2 -translate-x-1/2 z-20 px-4 py-1 bg-[#F1F1E8] rounded-full shadow-lg flex items-center justify-center mix-blend-screen"
                   style={{ marginTop: '-80px' }}
@@ -184,21 +214,16 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                <img src={`${ASSETS}/wing/DaunKananBawahWings.svg`} className="absolute z-10 pointer-events-none opacity-80" style={{ bottom: '-25vh', right: '-5vw', width: '20vw', height: '20vw' }} alt="Ornamen Bawah" />
             </div>
 
-            {/* TABLET LAYOUT (MD to LG/XL): Vertical Center Stack */}
+            {/* TABLET LAYOUT */}
             <div className="hidden md:flex xl:hidden w-full h-full flex-col justify-center items-center relative z-20 px-8 space-y-12 animate-in fade-in duration-700">
-               {/* Badge (Top) */}
                <div className="bg-[#F1F1E8] px-6 py-2 rounded-full shadow-lg">
                   <p className="font-judul font-extrabold text-black uppercase text-xs tracking-[0.2em]">The Wedding of</p>
                </div>
-
-               {/* Names (Center) */}
                <div className="text-center text-[#F1F1E8] drop-shadow-xl space-y-4">
                   <div className="text-6xl font-isi leading-none">{invitation.groomNick}</div>
                   <div className="text-3xl font-isi">&</div>
                   <div className="text-6xl font-isi leading-none">{invitation.brideNick}</div>
                </div>
-
-               {/* Date (Bottom) */}
                <div className="flex flex-col items-center justify-center space-y-1">
                   {(() => {
                      const date = new Date(invitation.eventDate || new Date());
@@ -222,9 +247,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
          </div>
 
 
-         {/* --- LAYER 1: PAPER (CONTENT WRAPPER) --- 
-             Ini adalah kertas undangan utama. Backgroundnya terpisah dari Wings.
-         */}
+         {/* --- LAYER 1: PAPER (CONTENT WRAPPER) --- */}
          <div
             className="relative z-10 w-full max-w-[420px] mx-auto md:mr-0 md:ml-auto min-h-screen shadow-2xl transition-all duration-500 overflow-hidden"
             style={{
@@ -238,21 +261,13 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
 
                {/* SECTION 1: COVER */}
                <BaseSectionWrapper id="cover" className="min-h-screen relative !px-0 flex flex-col justify-between overflow-hidden md:ml-auto md:mr-0">
-                  {/* Ornamen SVG Sudut */}
-                  {/* --- DECOR LAYER: BACKGROUND & TOP ASSETS (Ignore Padding) --- */}
                   <div className="absolute inset-0 pointer-events-none z-10">
-                     {/* Leaves */}
                      <img src={`${ASSETS}/01-Cover/DAUN KIRI ATAS.svg`} className="absolute top-0 left-0 w-32 md:w-40 z-30" alt="" />
                      <img src={`${ASSETS}/01-Cover/DAUN KANAN ATAS.svg`} className="absolute top-0 right-0 w-32 md:w-40 z-30" alt="" />
-
-                     {/* Gapura (Full Width) */}
                      <img src={`${ASSETS}/01-Cover/GAPURA.svg`} className="absolute top-[35%] left-0 w-full z-20 -translate-y-1/2 scale-[1.1] origin-top" alt="" />
-
-                     {/* Pattern Behind Gapura */}
                      <img src={`${ASSETS}/01-Cover/PATTERN ATAS BACKGROUND.svg`} className="absolute top-[40%] left-0 w-full z-15 opacity-80 -translate-y-1/2 scale-[1.5] origin-top" alt="" />
                   </div>
 
-                  {/* --- CONTENT LAYER (Respect Padding) --- */}
                   <div className="relative z-30 flex flex-col h-full justify-between items-center px-6 py-12">
                      <div className="text-center relative mt-16 space-y-4 animate-in fade-in zoom-in duration-1000">
                         <p className="tracking-[0.2em] text-xs uppercase font-judul font-bold text-[#8D6E63] mb-2">The Wedding of</p>
@@ -272,25 +287,21 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                         {guest && (
                            <div className="mt-8 bg-white/60 backdrop-blur-sm p-4 rounded-xl border border-[#D7CCC8] shadow-sm max-w-xs mx-auto animate-in slide-in-from-bottom-5">
                               <p className="text-[10px] uppercase tracking-widest text-[#8D6E63] mb-1">Kepada Yth:</p>
-                              <p className="text-lg font-bold text-[#5D4037]">{guest?.name}</p>
-                              <p className="text-xs text-[#8D6E63] mt-1">{guest?.category || "Tamu Undangan"}</p>
+                              <p className="text-lg font-bold text-[#5D4037]">{(guest as any).name}</p>
+                              <p className="text-xs text-[#8D6E63] mt-1">{(guest as any).category || "Tamu Undangan"}</p>
                               <button className="mt-3 bg-[#5D4037] text-white text-xs px-6 py-2 rounded-full shadow hover:bg-[#4E342E] transition">Buka Undangan</button>
                            </div>
                         )}
                      </div>
-
                      <div className="h-[300px]"></div>
                   </div>
 
-                  {/* --- DECOR LAYER: BOTTOM ASSETS (Ignore Padding) --- */}
                   <div className="absolute inset-x-0 bottom-0 h-[60%] pointer-events-none z-10 flex flex-col justify-end">
-                     {/* Wayang & Couple */}
                      <div className="relative w-full h-full">
                         <img src={`${ASSETS}/01-Cover/WAYANG DIATAS GRADIENT.svg`} className="absolute bottom-[20%] left-0 w-full z-16 opacity-80 mix-blend-multiply scale-[1.5] origin-bottom" alt="" />
                         <div className="absolute bottom-0 left-0 w-full h-[80%] flex justify-center items-end z-17 pb-6">
                            <img src={`${ASSETS}/01-Cover/PENGANTIN.svg`} className="h-full object-contain" alt="" />
                         </div>
-                        {/* Gradient Overlays */}
                         <img src={`${ASSETS}/01-Cover/GRADIENT DIATAS BUNGA KECIL.svg`} className="absolute bottom-0 left-0 w-full z-40 opacity-100 object-cover h-[50%]" alt="" />
                         <img src={`${ASSETS}/01-Cover/GRADIENT DIATAS BUNGA KECIL.svg`} className="absolute bottom-0 left-0 w-full z-50 opacity-70 object-cover h-[30%]" alt="" />
                      </div>
@@ -314,7 +325,9 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                      <GalleryFrame src={invitation.groomImageUrl || "https://placehold.co/400x400/png?text=Groom"} alt="Groom" className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]" />
                      <div>
                         <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.groomName}</h3>
-                        <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">Putra Bpk. {invitation.groomFather} & Ibu {invitation.groomMother}</p>
+                        <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">
+                           Putra Bpk. {invitation.groomFather || "..."} <br/> & Ibu {invitation.groomMother || "..."}
+                        </p>
                      </div>
                   </div>
 
@@ -325,7 +338,9 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                      <GalleryFrame src={invitation.brideImageUrl || "https://placehold.co/400x400/png?text=Bride"} alt="Bride" className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]" />
                      <div>
                         <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.brideName}</h3>
-                        <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">Putri Bpk. {invitation.brideFather} & Ibu {invitation.brideMother}</p>
+                        <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">
+                           Putri Bpk. {invitation.brideFather || "..."} <br/> & Ibu {invitation.brideMother || "..."}
+                        </p>
                      </div>
                   </div>
                </BaseSectionWrapper>
@@ -334,7 +349,6 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                <BaseSectionWrapper id="event" className="text-center py-20 px-6 bg-[#EFEBE9]/30 md:ml-auto md:mr-0">
                   <h3 className="font-judul text-2xl font-bold text-[#5D4037] mb-8">Rangkaian Acara</h3>
 
-                  {/* Countdown */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-[#D7CCC8] mb-12 max-w-sm mx-auto">
                      <div className="grid grid-cols-4 gap-2 divide-x divide-[#D7CCC8]">
                         <div><span className="text-xl font-bold block text-[#5D4037]">{timeLeft.days}</span><span className="text-[10px] uppercase text-[#8D6E63]">Hari</span></div>
@@ -349,7 +363,7 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                         <img src={`${ASSETS}/window.svg`} className="absolute right-[-20px] bottom-[-20px] w-24 opacity-10" alt="" />
                         <h4 className="font-judul text-xl font-bold text-[#5D4037] mb-1">Akad Nikah</h4>
                         <p className="text-sm text-gray-600 mb-4">{new Date(invitation.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                        <p className="text-sm font-bold text-[#8D6E63]">{invitation.eventTime} WIB</p>
+                        <p className="text-sm font-bold text-[#8D6E63]">08:00 WIB - Selesai</p>
                         <p className="text-xs text-gray-500 mt-2 max-w-[200px] mx-auto">{invitation.location}</p>
                      </div>
                      <div className="bg-white p-8 rounded-xl border-l-4 border-[#8D6E63] shadow-sm relative overflow-hidden">
@@ -361,7 +375,6 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                      </div>
                   </div>
 
-                  {/* Tombol Aksi */}
                   <div className="mt-10 flex flex-col gap-3 justify-center items-center">
                      <a href={invitation.mapUrl || "#"} target="_blank" className="w-full max-w-xs inline-flex justify-center items-center gap-2 bg-[#5D4037] text-white px-6 py-3 rounded-full text-sm font-bold shadow hover:bg-[#4E342E] transition-colors">
                         <MapPin className="w-4 h-4" /> Lihat Lokasi
@@ -400,35 +413,62 @@ export default function Jvn01({ invitation, guest }: WeddingTemplateProps) {
                   </button>
                </BaseSectionWrapper>
 
-               {/* SECTION 7: RSVP */}
+               {/* SECTION 7: RSVP (UPDATED) */}
                <BaseSectionWrapper id="rsvp" className="text-center py-16 px-6 md:ml-auto md:mr-0">
                   <h3 className="font-judul font-bold text-[#5D4037] mb-2 text-2xl">Buku Tamu</h3>
                   <div className="bg-white p-6 rounded-xl border border-[#D7CCC8] shadow-sm text-left space-y-4">
+                     
+                     {/* INPUT NAMA (Sekarang Bisa Diedit) */}
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Nama Lengkap</label>
-                        <input type="text" className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm text-gray-500 cursor-not-allowed" value={guest?.name || "Tamu Umum"} disabled />
+                        <input 
+                           type="text" 
+                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none" 
+                           value={rsvpForm.name} 
+                           onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})}
+                           placeholder="Masukkan Nama Anda"
+                           // disabled dihapus agar bisa diedit
+                        />
                      </div>
+
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Kehadiran</label>
-                        <select className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none" value={rsvpForm.attendance} onChange={(e) => setRsvpForm({ ...rsvpForm, attendance: e.target.value })} disabled={!guest || isPending}>
+                        <select 
+                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none" 
+                           value={rsvpForm.attendance} 
+                           onChange={(e) => setRsvpForm({ ...rsvpForm, attendance: e.target.value })} 
+                        >
                            <option value="ATTENDING">Hadir</option>
                            <option value="DECLINED">Berhalangan</option>
                         </select>
                      </div>
+
                      <div>
                         <label className="text-xs font-bold text-[#5D4037] block mb-1">Ucapan & Doa</label>
-                        <textarea className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24" placeholder="Tulis ucapan selamat..." value={rsvpForm.message} onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })} disabled={!guest || isPending} />
+                        <textarea 
+                           className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded p-3 text-sm focus:border-[#8D6E63] outline-none h-24" 
+                           placeholder="Tulis ucapan selamat..." 
+                           value={rsvpForm.message} 
+                           onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })} 
+                        />
                      </div>
-                     <button onClick={handleRsvpSubmit} disabled={!guest || isPending} className="w-full bg-[#5D4037] text-white py-3 rounded-lg font-bold mt-2 shadow hover:bg-[#4E342E] transition disabled:opacity-50">{isPending ? "Mengirim..." : "Kirim Konfirmasi"}</button>
+
+                     <button 
+                        onClick={handleRsvpSubmit} 
+                        disabled={isPending} 
+                        className="w-full bg-[#5D4037] text-white py-3 rounded-lg font-bold mt-2 shadow hover:bg-[#4E342E] transition disabled:opacity-50"
+                     >
+                        {isPending ? "Mengirim..." : "Kirim Konfirmasi"}
+                     </button>
                   </div>
 
-                  {/* UCAPAN LIST */}
+                  {/* DAFTAR UCAPAN (WISHES) */}
                   <div className="mt-12 space-y-4 text-left max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                      <h4 className="font-bold text-center text-sm mb-4 tracking-widest uppercase text-[#8D6E63]">Ucapan Terbaru</h4>
-                     {invitation.wishes && invitation.wishes.length > 0 ? (
-                        invitation.wishes.map((wish: any) => (
-                           <div key={wish.id} className="bg-white/50 p-4 rounded-lg border border-[#D7CCC8] shadow-sm">
-                              <p className="font-bold text-[#5D4037] text-sm">{wish.guest?.name || "Tamu"}</p>
+                     {(invitation as any).wishes && (invitation as any).wishes.length > 0 ? (
+                        (invitation as any).wishes.map((wish: any) => (
+                           <div key={wish.id} className="bg-white/50 p-4 rounded-lg border border-[#D7CCC8] shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                              <p className="font-bold text-[#5D4037] text-sm">{wish.name}</p>
                               <p className="text-xs text-gray-600 mt-1 leading-relaxed">"{wish.message}"</p>
                            </div>
                         ))
