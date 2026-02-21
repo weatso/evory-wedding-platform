@@ -114,6 +114,8 @@ model Invitation {
   eventTime     String   @default("08:00 WIB - Selesai")
   location      String
   mapUrl        String?
+
+  checkInPin        String  @default("0000") // PIN untuk override/susulan
   
   // --- ASET DIGITAL & KONFIGURASI ---
   coverImageUrl String?
@@ -151,6 +153,8 @@ model Guest {
   // Check-In (Buku Tamu Digital)
   isCheckedIn       Boolean    @default(false)
   checkInTime       DateTime?
+  checkedInById     String?    // ID User (Usher) yang melakukan scan
+  lastUpdatedBy     String?    // Jika ada update susulan, siapa yang update
 
   // Relasi
   invitationId      String
