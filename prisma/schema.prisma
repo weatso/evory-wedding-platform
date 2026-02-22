@@ -16,8 +16,16 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  PARTNER
   CLIENT
   USHER
+}
+
+enum PackageTier {
+  ESSENTIAL
+  PRESTIGE
+  ROYAL
+  CUSTOM
 }
 
 enum RsvpStatus {
@@ -38,6 +46,17 @@ model User {
   image         String?
   password      String?
   role          UserRole  @default(CLIENT)
+
+  // RELASI B2B: Siapa WO (Partner) yang mendaftarkan klien/usher ini?
+  partnerId     String?
+  partner       User?     @relation("PartnerToUsers", fields: [partnerId], references: [id])
+  managedUsers  User[]    @relation("PartnerToUsers")
+
+  // RELASI TEMPLATE: Template custom mana yang menjadi hak milik eksklusif user ini?
+  customTemplates Template[] @relation("CustomTemplates")
+
+  checkInsPerformed Guest[] @relation("UsherCheckIns")
+  updatesPerformed  Guest[] @relation("UsherUpdates")
   
   accounts      Account[]
   sessions      Session[]
@@ -85,13 +104,16 @@ model VerificationToken {
 }
 
 // ==========================================
-// 3. BUSINESS MODELS (Undangan & Tamu)
+// 3. BUSINESS MODELS (Tamu, Undangan & Tier)
 // ==========================================
 
 model Invitation {
   id            String   @id @default(cuid())
   slug          String   @unique // URL Undangan: evory.com/slug
   isActive      Boolean  @default(true)
+
+  // Tier Paket yang membatasi akses klien
+  packageTier   PackageTier @default(ESSENTIAL)
   
   templateId  String?
   template    Template? @relation(fields: [templateId], references: [id])
@@ -153,8 +175,13 @@ model Guest {
   // Check-In (Buku Tamu Digital)
   isCheckedIn       Boolean    @default(false)
   checkInTime       DateTime?
-  checkedInById     String?    // ID User (Usher) yang melakukan scan
-  lastUpdatedBy     String?    // Jika ada update susulan, siapa yang update
+  checkInPin        String?    // Pin khusus jika tamu check-in mandiri
+  
+  checkedInById     String?    
+  checkedInBy       User?      @relation("UsherCheckIns", fields: [checkedInById], references: [id])
+  
+  lastUpdatedById   String?    
+  lastUpdatedByUser User?      @relation("UsherUpdates", fields: [lastUpdatedById], references: [id])
 
   // Relasi
   invitationId      String
@@ -202,6 +229,13 @@ model Template {
   slug        String           @unique // jvn-01 (Ini yang dipakai di URL)
   description String?          // Deskripsi singkat
 
+  // Mengunci template ke tier tertentu
+  tier        PackageTier      @default(ESSENTIAL)
+
+  // Jika ini produk Full Custom yang Anda jual dengan harga premium
+  ownerId     String?          
+  owner       User?            @relation("CustomTemplates", fields: [ownerId], references: [id])
+
   invitations Invitation[]
   
   // Tampilan di Katalog (Frontend)
@@ -213,7 +247,6 @@ model Template {
 
   // Status
   isActive    Boolean          @default(true)
-  isPremium   Boolean          @default(false)
   
   // Relasi
   categoryId  String
