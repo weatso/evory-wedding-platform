@@ -52,6 +52,10 @@ model User {
   partner       User?     @relation("PartnerToUsers", fields: [partnerId], references: [id])
   managedUsers  User[]    @relation("PartnerToUsers")
 
+  // IDENTITAS PARTNER (B2B)
+  companyName   String?    // Misal: "Radeva Wedding Organizer"
+  companyLogo   String?    // URL gambar logo Partner dari R2
+
   // RELASI TEMPLATE: Template custom mana yang menjadi hak milik eksklusif user ini?
   customTemplates Template[] @relation("CustomTemplates")
 
