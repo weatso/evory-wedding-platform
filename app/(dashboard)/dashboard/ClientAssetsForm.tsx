@@ -17,7 +17,7 @@ interface Props {
   initialCover: string | null;
   initialGroom: string | null;
   initialBride: string | null;
-  initialWings: string | null; // [BARU]
+  initialWings: string | null;
   initialGallery: string[];
 }
 
@@ -28,7 +28,7 @@ export default function ClientAssetsForm({
   const [cover, setCover] = useState(initialCover);
   const [groom, setGroom] = useState(initialGroom);
   const [bride, setBride] = useState(initialBride);
-  const [wings, setWings] = useState(initialWings); // [BARU]
+  const [wings, setWings] = useState(initialWings);
   const [gallery, setGallery] = useState(initialGallery);
 
   const basePath = `users/${userId}/${invitationId}`;
@@ -45,10 +45,9 @@ export default function ClientAssetsForm({
       await updateInvitationImage(invitationId, "bride", url);
   };
 
-  // [BARU] Handler Upload Wings
   const handleWingsUpload = async (url: string) => {
       setWings(url);
-      await updateInvitationImage(invitationId, "wings", url); // Panggil action wings
+      await updateInvitationImage(invitationId, "wings", url); 
       toast.success("Background Desktop berhasil diubah!");
   };
 
@@ -96,7 +95,8 @@ export default function ClientAssetsForm({
                     <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-blue-100 shadow-sm bg-slate-100">
                         {groom ? <Image src={groom} alt="Groom" fill className="object-cover" /> : <div className="flex items-center justify-center h-full text-slate-300"><User className="w-16 h-16"/></div>}
                     </div>
-                    <SimpleUploadButton bucket="wedding-assets" path={`${basePath}/groom`} onUploadComplete={handleGroomUpload} label="Ganti Foto Pria"/>
+                    {/* PERBAIKAN: Ganti bucket menjadi destination="client" */}
+                    <SimpleUploadButton destination="client" path={`${basePath}/groom`} onUploadComplete={handleGroomUpload} label="Ganti Foto Pria"/>
                 </CardContent>
             </Card>
 
@@ -111,13 +111,14 @@ export default function ClientAssetsForm({
                     <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-pink-100 shadow-sm bg-slate-100">
                         {bride ? <Image src={bride} alt="Bride" fill className="object-cover" /> : <div className="flex items-center justify-center h-full text-slate-300"><Heart className="w-16 h-16"/></div>}
                     </div>
-                    <SimpleUploadButton bucket="wedding-assets" path={`${basePath}/bride`} onUploadComplete={handleBrideUpload} label="Ganti Foto Wanita" className="w-full"/>
+                    {/* PERBAIKAN: Ganti bucket menjadi destination="client" */}
+                    <SimpleUploadButton destination="client" path={`${basePath}/bride`} onUploadComplete={handleBrideUpload} label="Ganti Foto Wanita" className="w-full"/>
                 </CardContent>
             </Card>
         </div>
       </TabsContent>
 
-      {/* --- TAB 2: BACKGROUND & COVER (BARU) --- */}
+      {/* --- TAB 2: BACKGROUND & COVER --- */}
       <TabsContent value="background" className="space-y-6">
         
         {/* DESKTOP BACKGROUND (WINGS) */}
@@ -141,8 +142,9 @@ export default function ClientAssetsForm({
                         </div>
                     )}
                 </div>
+                {/* PERBAIKAN: Ganti bucket menjadi destination="client" */}
                 <SimpleUploadButton 
-                    bucket="wedding-assets" 
+                    destination="client" 
                     path={`${basePath}/wings`} 
                     onUploadComplete={handleWingsUpload}
                     label={wings ? "Ganti Background" : "Upload Background Custom"}
@@ -177,7 +179,8 @@ export default function ClientAssetsForm({
                 <p className="text-sm text-slate-500">Upload foto momen bahagia Anda di sini.</p>
             </div>
             <div className="w-40">
-                <SimpleUploadButton bucket="wedding-assets" path={`${basePath}/gallery`} onUploadComplete={handleGalleryUpload} label="Tambah Foto"/>
+                {/* PERBAIKAN: Ganti bucket menjadi destination="client" */}
+                <SimpleUploadButton destination="client" path={`${basePath}/gallery`} onUploadComplete={handleGalleryUpload} label="Tambah Foto"/>
             </div>
         </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { createTemplate, createTemplateCategory, deleteTemplate, deleteTemplateCategory } from "@/app/(dashboard)/admin/templates/actions";
+// PERBAIKAN: Import nama fungsi yang BENAR sesuai dengan actions.ts Anda
+import { createTemplate, createCategory, deleteTemplate, deleteCategory } from "@/app/(dashboard)/admin/templates/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-// Tipe data sesuaikan dengan return prisma
 interface Template {
     id: string;
     name: string;
@@ -31,12 +31,10 @@ export default function TemplateList({ initialCategories }: { initialCategories:
     const [categories, setCategories] = useState<Category[]>(initialCategories);
     const router = useRouter();
 
-    // STATE FOR NEW CATEGORY
     const [isAddingCat, setIsAddingCat] = useState(false);
     const [newCatTitle, setNewCatTitle] = useState("");
     const [newCatDesc, setNewCatDesc] = useState("");
 
-    // STATE FOR NEW TEMPLATE (tracked by category ID)
     const [addingTemplateTo, setAddingTemplateTo] = useState<string | null>(null);
     const [newTpl, setNewTpl] = useState({ name: "", desc: "", previewText: "", bgColor: "", textColor: "" });
 
@@ -45,13 +43,18 @@ export default function TemplateList({ initialCategories }: { initialCategories:
     const handleCreateCategory = async () => {
         if (!newCatTitle) return toast.error("Title required");
 
-        const res = await createTemplateCategory({ title: newCatTitle, description: newCatDesc });
+        // PERBAIKAN: Backend meminta FormData, bukan Object mentah
+        const formData = new FormData();
+        formData.append("name", newCatTitle);
+        formData.append("description", newCatDesc);
+
+        const res = await createCategory(formData);
         if (res.success) {
             toast.success("Category created");
             setIsAddingCat(false);
             setNewCatTitle("");
             setNewCatDesc("");
-            router.refresh(); // Refresh server component
+            router.refresh();
         } else {
             toast.error(res.error);
         }
@@ -61,7 +64,7 @@ export default function TemplateList({ initialCategories }: { initialCategories:
         const confirm = window.confirm("Delete this category and ALL its templates?");
         if (!confirm) return;
 
-        const res = await deleteTemplateCategory(id);
+        const res = await deleteCategory(id);
         if (res.success) {
             toast.success("Category deleted");
             router.refresh();
@@ -71,9 +74,23 @@ export default function TemplateList({ initialCategories }: { initialCategories:
     };
 
     const handleCreateTemplate = async (categoryId: string) => {
-        if (!newTpl.name || !newTpl.previewText) return toast.error("Name and Preview Text required");
+        if (!newTpl.name) return toast.error("Name is required");
 
-        const res = await createTemplate({ ...newTpl, categoryId });
+        // PERBAIKAN: Merakit FormData dengan field yang diwajibkan oleh Zod Schema Anda di actions.ts
+        const formData = new FormData();
+        formData.append("name", newTpl.name);
+        formData.append("categoryId", categoryId);
+        formData.append("description", newTpl.desc);
+        
+        // Buat slug otomatis
+        const slug = newTpl.name.toLowerCase().replace(/\s+/g, '-') + "-" + Date.now().toString().slice(-4);
+        formData.append("slug", slug);
+        
+        // Zod Anda di actions.ts mewajibkan "thumbnail". Karena di UI ini belum ada uploadernya,
+        // kita berikan placeholder agar tidak ditolak database. Anda bisa mengeditnya nanti di Dashboard Edit Template.
+        formData.append("thumbnail", "https://via.placeholder.com/300x400?text=No+Thumbnail");
+
+        const res = await createTemplate(formData);
         if (res.success) {
             toast.success("Template created");
             setAddingTemplateTo(null);
@@ -97,14 +114,11 @@ export default function TemplateList({ initialCategories }: { initialCategories:
 
     return (
         <div className="space-y-8">
-
-            {/* HEADER ACTION */}
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Active Categories</h2>
                 <Button onClick={() => setIsAddingCat(true)}><Plus size={16} className="mr-2" /> Add Category</Button>
             </div>
 
-            {/* ADD CATEGORY FORM */}
             {isAddingCat && (
                 <Card className="border-dashed border-2 border-primary/20 bg-primary/5">
                     <CardContent className="pt-6 space-y-4">
@@ -118,7 +132,6 @@ export default function TemplateList({ initialCategories }: { initialCategories:
                 </Card>
             )}
 
-            {/* CATEGORY LIST */}
             <div className="grid gap-6">
                 {initialCategories.map((cat) => (
                     <Card key={cat.id} className="overflow-hidden">
@@ -134,7 +147,6 @@ export default function TemplateList({ initialCategories }: { initialCategories:
 
                         <CardContent className="p-0">
                             <div className="p-4 space-y-4">
-                                {/* TEMPLATES GRID */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {cat.items.map(item => (
                                         <div key={item.id} className="border rounded-lg p-4 relative group hover:border-primary transition-colors">
@@ -155,7 +167,6 @@ export default function TemplateList({ initialCategories }: { initialCategories:
                                         </div>
                                     ))}
 
-                                    {/* ADD TEMPLATE BUTTON CARD */}
                                     <button
                                         onClick={() => setAddingTemplateTo(cat.id)}
                                         className="border border-dashed rounded-lg p-4 flex flex-col items-center justify-center text-muted-foreground hover:bg-slate-50 min-h-[200px]"
@@ -165,7 +176,6 @@ export default function TemplateList({ initialCategories }: { initialCategories:
                                     </button>
                                 </div>
 
-                                {/* ADD TEMPLATE FORM (Shows if adding to this cat) */}
                                 {addingTemplateTo === cat.id && (
                                     <div className="mt-4 p-4 border rounded bg-slate-50 animate-in slide-in-from-top-2">
                                         <h4 className="font-semibold mb-3">New Template for {cat.title}</h4>
@@ -187,7 +197,6 @@ export default function TemplateList({ initialCategories }: { initialCategories:
                     </Card>
                 ))}
             </div>
-
         </div>
     );
 }

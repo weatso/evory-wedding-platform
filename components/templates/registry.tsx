@@ -1,56 +1,45 @@
 import dynamic from "next/dynamic";
 import { ComponentType } from "react";
-// PERBAIKAN: Tambahkan 'Guest' di sini
-import { Invitation, Template, Guest } from "@prisma/client";
+import { Guest, Invitation, Template, Wish } from "@prisma/client";
 
-// --- 1. DEFINISI TIPE PROPS (WAJIB EXPORT) ---
+// --- 1. DEFINISI TIPE PROPS YANG BENAR ---
+// Pastikan relasi wishes membawa data guest untuk keperluan render nama
+export type WishWithGuest = Wish & {
+  guest: Guest | null;
+};
+
+export type InvitationWithTemplate = Invitation & {
+  template: Template | null;
+  wishes?: WishWithGuest[]; // Array relasional dari DB
+};
+
 export type WeddingTemplateProps = {
-  // Tambahkan 'wishes' & 'gallery' agar tidak error saat diakses di template
-  invitation: Invitation & { 
-    template: Template | null; 
-    wishes?: any[]; 
-    gallery?: string[] 
-  };
-  // PERBAIKAN: Tambahkan prop guest (Opsional)
+  invitation: InvitationWithTemplate;
   guest?: Guest | null;
 };
 
-// --- 2. CONFIG: DAFTAR TEMPLATE ---
-export const TEMPLATES = [
-  { 
-    id: "javanese-series", 
-    name: "Javanese Royal", 
-    category: "Javanese", 
-    path: "javanese/jvn-01",
-    isPrivate: false 
-  },
-  { 
-    id: "jvn-royal-01", 
-    name: "Javanese Royal (Code)", 
-    category: "Javanese", 
-    path: "javanese/jvn-01", 
-    isPrivate: false 
-  },
-  { 
-    id: "sultan-andara", 
-    name: "Exclusive for Raffi & Nagita", 
-    category: "Custom", 
-    path: "custom/sultan-01", 
-    isPrivate: true 
-  },
-];
+// --- 2. STATIC DICTIONARY REGISTRY ---
+// WAJIB statis (string literal) agar Next.js bisa melakukan Code Splitting.
+// File Javascript hanya akan diunduh peramban jika template ini benar-benar dipanggil.
+export const TEMPLATE_REGISTRY: Record<string, ComponentType<WeddingTemplateProps>> = {
+  "javanese-series": dynamic(() => import("./javanese/jvn-01"), { ssr: true }),
+  "jvn-royal-01": dynamic(() => import("./javanese/jvn-01"), { ssr: true }),
+  // "sultan-andara": dynamic(() => import("./custom/sultan-01"), { ssr: true }),
+  // "mdn-clean-01": dynamic(() => import("./minimalist/mdn-01"), { ssr: true }),
+};
 
-// --- 3. FUNGSI GET TEMPLATE ---
+// --- 3. FUNGSI PEMANGGIL ---
 export const getTemplate = (templateId: string | null | undefined): ComponentType<WeddingTemplateProps> => {
-  const template = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0];
+  const Component = TEMPLATE_REGISTRY[templateId || "javanese-series"];
   
-  return dynamic(() => import(`./${template.path}`), {
-    loading: () => (
-      <div className="h-screen flex flex-col items-center justify-center bg-stone-50 text-stone-600">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800 mb-4"></div>
-        <p className="text-xs uppercase tracking-widest">Loading Design...</p>
+  if (!Component) {
+    return () => (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-stone-900 text-white">
+        <h1 className="text-2xl font-bold mb-2">Template Tidak Ditemukan</h1>
+        <p className="text-stone-400 text-sm tracking-widest uppercase">ID: {templateId}</p>
       </div>
-    ),
-    ssr: true 
-  }) as ComponentType<WeddingTemplateProps>;
+    );
+  }
+
+  return Component;
 };

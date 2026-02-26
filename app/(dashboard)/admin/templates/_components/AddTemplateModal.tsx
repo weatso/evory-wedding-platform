@@ -93,11 +93,10 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
           <div className="border p-4 rounded-md bg-slate-50">
             <Label>Thumbnail Image</Label>
             <div className="mt-2">
-               {/* FIX: Menambahkan props wajib bucket & path */}
-               <SimpleUploadButton 
-                  bucket="wedding-assets"
+               <SimpleUploadButton
+                  destination="template"
                   path="templates"
-                  onUploadComplete={(url: string) => setImageUrl(url)} 
+                  onUploadComplete={(url: string) => setImageUrl(url)}
                />
                
                {imageUrl && (

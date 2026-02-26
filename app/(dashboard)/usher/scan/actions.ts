@@ -80,7 +80,9 @@ export async function processCheckIn(
                 isCheckedIn: true, 
                 checkInTime: new Date(), // Update waktu checkin terakhir
                 pax: newPaxTotal,
-                checkedInBy: session.user.name || session.user.email // Audit Trail
+                // PERBAIKAN: Masukkan ID dari sesi user ke dalam Foreign Key
+                checkedInById: session.user.id,
+                lastUpdatedById: session.user.id // Menyimpan jejak siapa yang update terakhir
             }
         });
 
@@ -92,6 +94,7 @@ export async function processCheckIn(
             msg: mode === 'ADD' ? `Berhasil tambah +${inputPax} pax` : `Check-in Sukses (${inputPax} pax)`
         };
     } catch (e) {
+        console.error("Check-in Error:", e); // Tambahkan log error agar Anda tahu jika DB gagal
         return { error: "Database Error" };
     }
 }

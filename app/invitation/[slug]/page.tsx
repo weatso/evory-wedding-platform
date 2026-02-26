@@ -1,75 +1,45 @@
-import { prisma } from "@/lib/prisma"; // Pastikan path ini benar (bisa @/lib/db)
-import TemplateRenderer from "@/components/templates/TemplateRenderer";
+import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { Metadata } from "next";
+import TemplateRenderer from "@/components/templates/TemplateRenderer";
 
-interface PageProps {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ u?: string }>; // Menangkap parameter ?u=... dari URL
-}
+export const revalidate = 60; 
 
-// 1. GENERATE METADATA (Untuk SEO & Preview WA)
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
-  
-  const invitation = await prisma.invitation.findUnique({
-    where: { slug },
-    select: { groomNick: true, brideNick: true, location: true, eventDate: true }
+export async function generateStaticParams() {
+  const invitations = await prisma.invitation.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+    take: 100, 
   });
-
-  if (!invitation) return { title: "Undangan Tidak Ditemukan" };
-
-  return {
-    title: `The Wedding of ${invitation.groomNick} & ${invitation.brideNick}`,
-    description: `Kami mengundang Anda untuk hadir pada ${new Date(invitation.eventDate).toLocaleDateString('id-ID')} di ${invitation.location}.`,
-  };
+  return invitations.map((inv) => ({ slug: inv.slug }));
 }
 
-// 2. HALAMAN UTAMA (Server Component)
-export default async function InvitationPage({ params, searchParams }: PageProps) {
-  const { slug } = await params;
-  const { u: guestCode } = await searchParams; // Ambil kode tamu dari URL (?u=...)
+export default async function InvitationPage({ params }: { params: { slug: string } }) {
+  // Tunggu parameter sebelum mengakses propertinya (Penting di Next.js 15/Turbo)
+  const resolvedParams = await params;
+  const { slug } = resolvedParams;
 
-  // A. Fetch Data Undangan Lengkap
-  const invitation = await prisma.invitation.findUnique({
-    where: { slug },
+  const invitationData = await prisma.invitation.findUnique({
+    where: { slug, isActive: true },
     include: {
-      template: true, // Ambil info template untuk menentukan desain
-      wishes: { // Ambil ucapan untuk ditampilkan
-        orderBy: { createdAt: "desc" },
-        include: { guest: true } 
-      } 
-    },
+      template: true, // Data template (jvn-01, dll) ditarik di sini
+      wishes: {
+        include: { guest: true },
+        orderBy: { createdAt: 'desc' },
+      }
+    }
   });
 
-  // Jika tidak ketemu, tampilkan 404
-  if (!invitation) return notFound();
-
-  // Jika undangan dinonaktifkan oleh Admin
-  if (!invitation.isActive) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-stone-50 text-center p-8">
-        <div>
-          <h1 className="text-3xl font-bold text-stone-800 mb-2">Acara Telah Selesai</h1>
-          <p className="text-stone-600">Undangan ini sudah tidak aktif.</p>
-        </div>
-      </div>
-    );
+  if (!invitationData || !invitationData.template) {
+    return notFound();
   }
 
-  // B. Cek Data Tamu (Jika ada kode ?u= di URL)
-  let guestData = null;
-  
-  if (guestCode) {
-    guestData = await prisma.guest.findUnique({
-      where: { 
-        guestCode: guestCode,
-        invitationId: invitation.id // Pastikan kode ini milik undangan yang benar
-      }
-    });
-  }
-
-  // C. Render Template
-  // Kita kirim data undangan & data tamu ke TemplateRenderer
-  return <TemplateRenderer invitation={invitation} guest={guestData} />;
+  return (
+    <main className="min-h-screen bg-black w-full overflow-x-hidden">
+      {/* PERBAIKAN: Mengirim data sesuai yang diminta antarmuka TemplateRenderer Anda */}
+      <TemplateRenderer 
+        invitation={invitationData as any} 
+        guest={null} 
+      />
+    </main>
+  );
 }

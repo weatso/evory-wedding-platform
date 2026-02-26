@@ -1,4 +1,4 @@
-// app/admin/users/actions.ts
+// app/(dashboard)/admin/users/actions.ts
 'use server';
 
 import { auth } from "@/auth";
@@ -18,9 +18,10 @@ export type ActionState = {
 };
 
 // --- Schema Validasi (Zod) ---
+// FIX: Sesuaikan role dengan Enum UserRole di schema.prisma baru kita
 const AddUserSchema = z.object({
   name: z.string().min(1, "Nama harus diisi"),
-  role: z.enum(["ADMIN", "CLIENT"]),
+  role: z.enum(["ADMIN", "PARTNER", "CLIENT", "USHER"]), 
   email: z.string().email("Format email tidak valid"),
   password: z.string().min(6, "Password minimal 6 karakter"),
   
@@ -89,7 +90,6 @@ export async function addUser(prevState: ActionState, formData: FormData): Promi
     const hashedPassword = await hash(data.password, 10);
 
     // 6. Simpan ke Database (Transaction: User + Invitation)
-    // Kita gunakan transaction agar User & Invitation tersimpan paket (All or Nothing)
     await prisma.$transaction(async (tx) => {
       
       // A. Create User
@@ -98,34 +98,36 @@ export async function addUser(prevState: ActionState, formData: FormData): Promi
           name: data.name,
           email: data.email,
           password: hashedPassword,
-          role: data.role,
+          role: data.role as any, // TypeScript akan otomatis membaca sebagai Enum
         },
       });
 
-      // B. Create Invitation
-      // Kita generate data default untuk field yang tidak ada di form (seperti Nama Orang Tua)
-      await tx.invitation.create({
-        data: {
-          slug: data.slug,
-          userId: newUser.id,
-          
-          groomName: data.groomName,
-          groomNick: data.groomName.split(" ")[0], // Ambil kata pertama sebagai nama panggilan
-          groomFather: "Bapak Pria",
-          groomMother: "Ibu Pria",
-          
-          brideName: data.brideName,
-          brideNick: data.brideName.split(" ")[0], // Ambil kata pertama sebagai nama panggilan
-          brideFather: "Bapak Wanita",
-          brideMother: "Ibu Wanita",
-          
-          eventDate: new Date(data.eventDate),
-          location: "Lokasi Belum Diisi",
-          
-          isActive: true,
-          theme: "RUSTIC_A", // Default Theme
-        },
-      });
+      // B. Create Invitation (Hanya jika role-nya CLIENT. Partner/Admin tidak butuh undangan dummy di sini)
+      if (data.role === "CLIENT") {
+          await tx.invitation.create({
+            data: {
+              slug: data.slug,
+              userId: newUser.id,
+              
+              groomName: data.groomName,
+              groomNick: data.groomName.split(" ")[0], 
+              groomFather: "Bapak Pria",
+              groomMother: "Ibu Pria",
+              
+              brideName: data.brideName,
+              brideNick: data.brideName.split(" ")[0], 
+              brideFather: "Bapak Wanita",
+              brideMother: "Ibu Wanita",
+              
+              eventDate: new Date(data.eventDate),
+              location: "Lokasi Belum Diisi",
+              
+              isActive: true,
+              // FIX: Menghapus property 'theme' yang sudah tidak ada di database
+              // templateId akan bernilai null secara default sampai klien/admin memilih template nanti
+            },
+          });
+      }
     });
 
   } catch (error) {

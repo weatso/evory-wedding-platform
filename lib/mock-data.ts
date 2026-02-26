@@ -1,24 +1,33 @@
 // lib/mock-data.ts
 import { WeddingTemplateProps } from "@/types/template";
+import { PackageTier, RsvpStatus } from "@prisma/client";
 
 export const MOCK_WEDDING_DATA: WeddingTemplateProps = {
   invitation: {
+    id: "mock-inv-1",
+    slug: "romeo-juliet",
+    isActive: true,
+    packageTier: PackageTier.ESSENTIAL,
+    templateId: null,
+    userId: null,
+    checkInPin: "0000",
+    coverImageUrl: "https://via.placeholder.com/800x1200?text=Cover",
+    musicUrl: null,
+    themeConfig: null, 
+    createdAt: new Date(),
+    updatedAt: new Date(),
+
     groomName: "Romeo Montagu",
     groomNick: "Romeo",
-    // Isi data dummy orang tua
     groomFather: "Lord Montagu",
     groomMother: "Lady Montagu",
+    groomImageUrl: "https://via.placeholder.com/400x400?text=Romeo", 
     
     brideName: "Juliet Capulet",
     brideNick: "Juliet",
-
-    groomImage: "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.5151844279236296.jpg", 
-    brideImage: "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.3662948404406101.jpg",
-
-
-    // Isi data dummy orang tua
     brideFather: "Lord Capulet",
     brideMother: "Lady Capulet",
+    brideImageUrl: "https://via.placeholder.com/400x400?text=Juliet",
 
     eventDate: new Date("2025-12-31T08:00:00Z"),
     eventTime: "08:00 WIB - Selesai",
@@ -26,33 +35,57 @@ export const MOCK_WEDDING_DATA: WeddingTemplateProps = {
     mapUrl: "https://maps.google.com",
 
     gallery: [
-      // Foto 1 (Potrait Kiri)
-      "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.8857105156388982.jpg", 
-      
-      // Foto 2 (Potrait Kanan)
-      "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.8857105156388982.jpg", 
-      
-      // Foto 3 (Landscape Bawah)
-      "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/uploads/0.8857105156388982.jpg"
+      "https://via.placeholder.com/800x1200?text=Gallery+1", 
+      "https://via.placeholder.com/800x1200?text=Gallery+2", 
+      "https://via.placeholder.com/1200x800?text=Gallery+3"
     ],
 
     wishes: [
       {
-        id: "1",
+        id: "mock-wish-1",
         message: "Selamat menempuh hidup baru!",
         createdAt: new Date(),
-        guest: { name: "Paris" }
+        senderName: "Paris",
+        invitationId: "mock-inv-1",
+        guestId: "mock-guest-1",
+        guest: { 
+          id: "mock-guest-1",
+          name: "Paris",
+          category: "VIP",
+          guestCode: "PARIS-001",
+          whatsapp: null,
+          rsvpStatus: RsvpStatus.PENDING,
+          pax: 1,
+          totalPaxAllocated: 2,
+          isCheckedIn: false,
+          checkInTime: null,
+          checkInPin: null,
+          checkedInById: null,
+          lastUpdatedById: null,
+          invitationId: "mock-inv-1",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
       }
     ]
   },
+  
   guest: {
     id: "g-1",
     name: "Tamu Kehormatan",
     guestCode: "VIP-001",
-    rsvpStatus: "PENDING",
-  },
-  config: {
-    primaryColor: "#D4AF37",
-    fontFamily: "serif",
-  }
+    rsvpStatus: RsvpStatus.PENDING,
+    category: "VIP",
+    whatsapp: null,
+    pax: 1,
+    totalPaxAllocated: 2,
+    isCheckedIn: false,
+    checkInTime: null,
+    checkInPin: null,
+    checkedInById: null,
+    lastUpdatedById: null,
+    invitationId: "mock-inv-1",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  } as any
 };
