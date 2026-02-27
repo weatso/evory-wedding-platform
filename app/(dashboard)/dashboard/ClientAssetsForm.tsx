@@ -117,7 +117,6 @@ export default function ClientAssetsForm({
             </Card>
         </div>
       </TabsContent>
-
       {/* --- TAB 2: BACKGROUND & COVER --- */}
       <TabsContent value="background" className="space-y-6">
         

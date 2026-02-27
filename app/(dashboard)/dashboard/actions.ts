@@ -135,3 +135,51 @@ export async function deleteWish(wishId: string) {
     return { error: "Gagal menghapus ucapan." };
   }
 }
+
+// 5. UPDATE DATA DETAIL UNDANGAN (OLEH KLIEN)
+export async function updateClientDetails(invitationId: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  try {
+    // 1. Verifikasi kepemilikan (Klien hanya bisa edit undangannya sendiri, atau Admin)
+    const invitation = await prisma.invitation.findUnique({
+      where: { id: invitationId },
+      select: { userId: true, slug: true }
+    });
+
+    if (!invitation) return { error: "Undangan tidak ditemukan." };
+    if (invitation.userId !== session.user.id && session.user.role !== "ADMIN") {
+      return { error: "Akses ditolak." };
+    }
+
+    // 2. Gabungkan tanggal & jam
+    const rawDate = formData.get("eventDate") as string;
+    const rawTime = formData.get("eventTime") as string;
+    const combinedDateTime = new Date(`${rawDate}T${rawTime}:00`);
+
+    // 3. Update database
+    await prisma.invitation.update({
+      where: { id: invitationId },
+      data: {
+        groomName: formData.get("groomName") as string,
+        groomNick: formData.get("groomNick") as string,
+        brideName: formData.get("brideName") as string,
+        brideNick: formData.get("brideNick") as string,
+        location: formData.get("location") as string,
+        mapUrl: formData.get("mapUrl") as string,
+        eventDate: isNaN(combinedDateTime.getTime()) ? undefined : combinedDateTime,
+        eventTime: formData.get("eventTimeDisplay") as string, // misal: "08:00 WIB"
+      }
+    });
+
+    // 4. HANCURKAN CACHE!
+    revalidatePath("/dashboard");
+    revalidatePath(`/invitation/${invitation.slug}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Gagal update detail:", error);
+    return { error: "Gagal menyimpan perubahan." };
+  }
+}

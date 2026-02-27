@@ -72,7 +72,7 @@ export default async function AdminTemplatesPage() {
                {/* Overlay Action */}
                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <a 
-                    href={tpl.previewUrl || "#"} 
+                    href={`/preview/${tpl.slug}`} 
                     target="_blank" 
                     className="bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-100"
                   >

@@ -6,6 +6,7 @@ import { Users, UserCheck, UserX, MessageSquare, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ClientAssetsForm from "./ClientAssetsForm";
+import ClientDetailsForm from "./ClientDetailsForm";
 import DeleteWishButton from "./DeleteWishButton";
 import AutoRefresh from "./live/AutoRefresh"; 
 
@@ -130,6 +131,7 @@ export default async function DashboardPage(props: Props) {
         
         {/* KOLOM KIRI: EDIT DATA & ASSETS (PERBAIKAN PROPS) */}
         <div className="lg:col-span-2 space-y-6">
+          <ClientDetailsForm invitation={invitation} />
            <ClientAssetsForm 
               invitationId={invitation.id}
               userId={invitation.userId!} // Tanda seru krn pasti ada di tahap ini
