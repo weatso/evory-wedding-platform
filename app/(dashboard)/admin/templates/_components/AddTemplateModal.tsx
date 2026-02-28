@@ -12,8 +12,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { createTemplate } from "../actions";
-// PASTIKAN IMPORT INI SESUAI FILE ANDA (Default Export)
 import SimpleUploadButton from "@/components/dashboard/SimpleUploadButton";
+import { toast } from "sonner"; // Tambahkan toast untuk notifikasi yang lebih elegan
 
 const selectStyle = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -38,8 +38,9 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
 
     setLoading(false);
     if (res?.error) {
-      alert(res.error);
+      toast.error(res.error);
     } else {
+      toast.success("Template berhasil ditambahkan!");
       setOpen(false); 
       setImageUrl(""); 
     }
@@ -48,7 +49,7 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>+ Tambah Template</Button>
+        <Button className="bg-slate-900 text-white hover:bg-slate-800">+ Tambah Template</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg overflow-y-auto max-h-[90vh]">
         <DialogHeader>
@@ -57,72 +58,78 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           
-          {/* NAMA */}
-          <div>
-            <Label>Nama Template</Label>
-            <Input name="name" placeholder="Contoh: JVN-01 (Kraton)" required />
+          <div className="grid grid-cols-2 gap-4">
+            {/* NAMA */}
+            <div>
+              <Label className="text-xs">Nama Template</Label>
+              <Input name="name" placeholder="Contoh: Kraton Mewah" required className="mt-1" />
+            </div>
+
+            {/* SLUG */}
+            <div>
+              <Label className="text-xs">Slug (ID Unik)</Label>
+              <Input name="slug" placeholder="jvn-01" required className="mt-1" />
+              <p className="text-[10px] text-gray-500 mt-1">Sesuai dengan di registry.tsx</p>
+            </div>
           </div>
 
-          {/* SLUG */}
-          <div>
-            <Label>Slug (URL)</Label>
-            <Input name="slug" placeholder="jvn-01" required />
-            <p className="text-[10px] text-gray-500">Hanya huruf kecil, angka, dan strip (-)</p>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* KATEGORI (Dimensi Visual) */}
+            <div>
+              <Label className="text-xs">Kategori Desain</Label>
+              {categories.length > 0 ? (
+                <select name="categoryId" className={`${selectStyle} mt-1`} required defaultValue="">
+                  <option value="" disabled>-- Pilih --</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-[10px] text-red-500 mt-1">Buat kategori dulu.</p>
+              )}
+            </div>
 
-          {/* KATEGORI */}
-          <div>
-            <Label>Kategori</Label>
-            {categories.length > 0 ? (
-              <select name="categoryId" className={selectStyle} required defaultValue="">
-                <option value="" disabled>-- Pilih Kategori --</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
+            {/* TIER PAKET (Dimensi Bisnis) -> BARU DITAMBAHKAN */}
+            <div>
+              <Label className="text-xs">Hak Akses (Tier)</Label>
+              <select name="tier" className={`${selectStyle} mt-1`} required defaultValue="ESSENTIAL">
+                <option value="ESSENTIAL">Essential (Ekonomis)</option>
+                <option value="PRESTIGE">Prestige (Menengah)</option>
+                <option value="ROYAL">Royal Suites (Premium)</option>
+                <option value="CUSTOM">The Legacy (Full Custom)</option>
               </select>
-            ) : (
-              <p className="text-sm text-red-500 mt-1">
-                Belum ada kategori. Silakan buat kategori dulu.
-              </p>
-            )}
+            </div>
           </div>
 
-          {/* UPLOAD THUMBNAIL */}
-          <div className="border p-4 rounded-md bg-slate-50">
-            <Label>Thumbnail Image</Label>
+          {/* UPLOAD THUMBNAIL (Diselaraskan dengan Arsitektur R2) */}
+          <div className="border border-slate-200 p-4 rounded-lg bg-slate-50">
+            <Label className="text-xs">Thumbnail Katalog (Preview Image)</Label>
             <div className="mt-2">
                <SimpleUploadButton
-                  destination="template"
-                  path="templates"
+                  // PERUBAHAN: Destination diubah menjadi "system" untuk memisahkan dari data klien
+                  destination="system"
+                  path="templates/thumbnails"
                   onUploadComplete={(url: string) => setImageUrl(url)}
+                  label="Upload Gambar Preview"
                />
                
                {imageUrl && (
-                 <div className="mt-2 relative w-full h-32 bg-gray-200 rounded overflow-hidden">
+                 <div className="mt-3 relative w-full h-40 bg-slate-200 rounded-md overflow-hidden border border-slate-300 shadow-inner">
                     <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
                  </div>
                )}
-               
                <input type="hidden" name="thumbnail" value={imageUrl} required />
             </div>
           </div>
 
-          {/* PREVIEW URL */}
-          <div>
-            <Label>Link Preview (Demo)</Label>
-            <Input name="previewUrl" placeholder="/invitation/demo-jvn01" />
-          </div>
-
           {/* DESKRIPSI */}
           <div>
-            <Label>Deskripsi Singkat</Label>
-            <Input name="description" placeholder="Tema Jawa Klasik..." />
+            <Label className="text-xs">Deskripsi Singkat</Label>
+            <Input name="description" placeholder="Desain bernuansa adat jawa klasik..." className="mt-1" />
           </div>
 
-          <Button type="submit" disabled={loading || !imageUrl || categories.length === 0} className="w-full">
-            {loading ? "Menyimpan..." : "Simpan Template"}
+          <Button type="submit" disabled={loading || !imageUrl || categories.length === 0} className="w-full bg-evory-gold text-black hover:bg-yellow-500 font-bold mt-4">
+            {loading ? "Menyimpan ke Database..." : "Rilis Template"}
           </Button>
 
         </form>

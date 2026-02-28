@@ -10,16 +10,15 @@ import crypto from "crypto";
 export async function getPresignedUploadUrl(
   fileName: string, 
   contentType: string, 
-  destination: "client" | "template", // Mengunci rute secara ketat
+  destination: "client" | "system", // <-- UBAH DI SINI
   folder: string = "general"
 ) {
-  // 1. Otorisasi Ketat
   const session = await auth();
   if (!session || !session.user) {
     throw new Error("Unauthorized Access: Anda tidak memiliki izin.");
   }
 
-  // 2. Routing Aset (Pemisahan Infrastruktur)
+  // Jika destination adalah 'system', kita tetap memanggil env R2_TEMPLATE_BUCKET milik Anda
   const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
   const publicUrlBase = destination === "client" ? process.env.R2_CLIENT_PUBLIC_URL : process.env.R2_TEMPLATE_PUBLIC_URL;
 

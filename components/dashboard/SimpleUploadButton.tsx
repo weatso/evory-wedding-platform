@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { getPresignedUploadUrl } from "@/lib/actions/upload"; 
 
 interface Props {
-  destination: "client" | "template"; // Sanitasi: Tidak lagi menggunakan 'bucket'
+  destination: "client" | "system"; // <-- UBAH 'template' MENJADI 'system'
   path: string;
   onUploadComplete: (url: string) => void;
   label?: string;
