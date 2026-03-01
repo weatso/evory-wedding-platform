@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { getPresignedUploadUrl } from "@/lib/actions/upload";
 
 interface AssetUploaderProps {
-  destination?: "client" | "template"; // Default ke template untuk area Admin
+  // PERBAIKAN: Ubah 'template' menjadi 'system' sesuai arsitektur R2 baru kita
+  destination?: "client" | "system"; 
   storagePath: string; 
   onUploadComplete: (url: string) => void;
   defaultImage?: string;
@@ -16,7 +17,7 @@ interface AssetUploaderProps {
 }
 
 export default function AssetUploader({
-  destination = "template", 
+  destination = "system", // PERBAIKAN: Default ke 'system' untuk area Admin
   storagePath, 
   onUploadComplete,
   defaultImage,

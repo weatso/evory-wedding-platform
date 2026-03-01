@@ -45,18 +45,40 @@ function ScannerContent() {
         getEventDetail(eventId).then(d => d && setEventName(`${d.groomNick} & ${d.brideNick}`));
     }, [eventId]);
 
-    // 2. Logic Scanner
+    // 2. Logic Scanner (Diperbaiki untuk mencegah HP Usher Overheat/Freeze)
     useEffect(() => {
         if (!isScanning || activeGuest || !eventId) return;
-        const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
         
-        scanner.render((decodedText) => {
-            scanner.clear();
-            setIsScanning(false);
-            handleLookup(decodedText);
-        }, () => {});
+        // Tambahkan aspectRatio untuk memastikan kamera proporsional di HP
+        const scanner = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0 
+        }, false);
+        
+        scanner.render(
+            (decodedText) => {
+                // WAJIB: Tunggu hardware kamera mati DULU, baru ubah state React
+                scanner.clear().then(() => {
+                    setIsScanning(false);
+                    handleLookup(decodedText);
+                }).catch((e) => {
+                    console.error("Gagal mematikan hardware kamera:", e);
+                    // Fallback jika hardware macet
+                    setIsScanning(false);
+                    handleLookup(decodedText);
+                });
+            }, 
+            (error) => { 
+                // Abaikan error di sini. Pustaka ini membuang error setiap frame (10x per detik) 
+                // jika tidak menemukan QR. Jangan pernah melakukan setState atau console.log di sini.
+            }
+        );
 
-        return () => { scanner.clear().catch(() => {}); };
+        return () => { 
+            // Cleanup saat komponen dihancurkan (misal Usher klik tombol Keluar)
+            scanner.clear().catch(() => {}); 
+        };
     }, [isScanning, activeGuest, eventId]);
 
     // HANDLER: Cari Tamu

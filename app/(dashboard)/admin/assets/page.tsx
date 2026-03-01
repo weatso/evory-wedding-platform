@@ -17,12 +17,15 @@ interface R2FileObject {
 export default function MediaLibraryPage() {
   const [files, setFiles] = useState<R2FileObject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [destination, setDestination] = useState<"template" | "client">("template");
+  
+  // PERBAIKAN: Ubah "template" menjadi "system"
+  const [destination, setDestination] = useState<"system" | "client">("system");
   const [folderPath, setFolderPath] = useState("general"); 
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
-    const res = await listR2Files(destination, folderPath);
+    // Pastikan Server Action listR2Files Anda mendukung parameter "system"
+    const res = await listR2Files(destination as any, folderPath);
     
     if (!res.success) {
       toast.error(res.error);
@@ -49,7 +52,7 @@ export default function MediaLibraryPage() {
     if (!confirm(`Yakin ingin memusnahkan aset ini dari R2? Tindakan ini tidak bisa dibatalkan.`)) return;
     
     // Tembak Server Action untuk hard-delete
-    const res = await deleteFromR2(fileUrl, destination);
+    const res = await deleteFromR2(fileUrl, destination as any);
     
     if (!res.success) {
       toast.error(res.error);
@@ -63,7 +66,7 @@ export default function MediaLibraryPage() {
     <div className="min-h-screen bg-gray-50 p-8 font-sans text-gray-800">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-2 text-[#5D4037]">R2 Media Library</h1>
-        <p className="text-gray-500 mb-8">Pusat kontrol CDN Cloudflare untuk Template & Aset.</p>
+        <p className="text-gray-500 mb-8">Pusat kontrol CDN Cloudflare untuk System & Aset Client.</p>
 
         {/* --- 1. AREA UPLOAD --- */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
@@ -83,10 +86,12 @@ export default function MediaLibraryPage() {
                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Target Bucket</label>
                    <select 
                      value={destination} 
-                     onChange={(e) => setDestination(e.target.value as "template" | "client")}
+                     // PERBAIKAN: Ubah casting menjadi "system" | "client"
+                     onChange={(e) => setDestination(e.target.value as "system" | "client")}
                      className="block w-full p-2 rounded border border-slate-300 bg-white"
                    >
-                     <option value="template">Templates (evory-templates)</option>
+                     {/* PERBAIKAN: Value diubah menjadi "system" */}
+                     <option value="system">System (evory-templates)</option>
                      <option value="client">Clients (evory-clients)</option>
                    </select>
                 </div>
