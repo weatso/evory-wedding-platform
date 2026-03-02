@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QrCode, MonitorPlay, LogOut, Calendar, MapPin, Clock } from "lucide-react";
 
+export const dynamic = 'force-dynamic';
+
 export default async function UsherDashboard() {
   const session = await auth();
     
