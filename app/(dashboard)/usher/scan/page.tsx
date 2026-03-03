@@ -45,39 +45,81 @@ function ScannerContent() {
         getEventDetail(eventId).then(d => d && setEventName(`${d.groomNick} & ${d.brideNick}`));
     }, [eventId]);
 
-    // 2. Logic Scanner (Diperbaiki untuk mencegah HP Usher Overheat/Freeze)
+   // 2. Logic Scanner (Diperbaiki: Proteksi Hardware Lock)
     useEffect(() => {
         if (!isScanning || activeGuest || !eventId) return;
         
-        // Tambahkan aspectRatio untuk memastikan kamera proporsional di HP
+        // Buat instance scanner
         const scanner = new Html5QrcodeScanner("reader", { 
             fps: 10, 
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0 
         }, false);
         
+        let isScannerCleared = false; // Flag pelindung
+
         scanner.render(
             (decodedText) => {
-                // WAJIB: Tunggu hardware kamera mati DULU, baru ubah state React
+                if (isScannerCleared) return;
+                isScannerCleared = true; // Kunci agar tidak membaca 2 kali
+                
+                // Matikan hardware dengan aman DULU
                 scanner.clear().then(() => {
                     setIsScanning(false);
                     handleLookup(decodedText);
                 }).catch((e) => {
-                    console.error("Gagal mematikan hardware kamera:", e);
-                    // Fallback jika hardware macet
+                    console.error("Gagal matikan hardware:", e);
                     setIsScanning(false);
                     handleLookup(decodedText);
                 });
             }, 
-            (error) => { 
-                // Abaikan error di sini. Pustaka ini membuang error setiap frame (10x per detik) 
-                // jika tidak menemukan QR. Jangan pernah melakukan setState atau console.log di sini.
-            }
+            (error) => {} // Abaikan log error tiap frame
         );
 
         return () => { 
-            // Cleanup saat komponen dihancurkan (misal Usher klik tombol Keluar)
-            scanner.clear().catch(() => {}); 
+            // Cleanup mutlak saat komponen ditinggalkan
+            if (!isScannerCleared) {
+                isScannerCleared = true;
+                scanner.clear().catch(() => {}); 
+            }
+        };
+    }, [isScanning, activeGuest, eventId]);// 2. Logic Scanner (Diperbaiki: Proteksi Hardware Lock)
+    useEffect(() => {
+        if (!isScanning || activeGuest || !eventId) return;
+        
+        // Buat instance scanner
+        const scanner = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0 
+        }, false);
+        
+        let isScannerCleared = false; // Flag pelindung
+
+        scanner.render(
+            (decodedText) => {
+                if (isScannerCleared) return;
+                isScannerCleared = true; // Kunci agar tidak membaca 2 kali
+                
+                // Matikan hardware dengan aman DULU
+                scanner.clear().then(() => {
+                    setIsScanning(false);
+                    handleLookup(decodedText);
+                }).catch((e) => {
+                    console.error("Gagal matikan hardware:", e);
+                    setIsScanning(false);
+                    handleLookup(decodedText);
+                });
+            }, 
+            (error) => {} // Abaikan log error tiap frame
+        );
+
+        return () => { 
+            // Cleanup mutlak saat komponen ditinggalkan
+            if (!isScannerCleared) {
+                isScannerCleared = true;
+                scanner.clear().catch(() => {}); 
+            }
         };
     }, [isScanning, activeGuest, eventId]);
 
@@ -157,19 +199,26 @@ function ScannerContent() {
                 </div>
             )}
 
-            {/* AREA UTAMA */}
-            {!activeGuest ? (
-                // 1. TAMPILAN KAMERA / STANDBY
-                <div className="w-full max-w-md bg-slate-800 p-6 rounded-xl border border-slate-700 text-center">
-                    {isScanning ? (
-                        <div id="reader" className="overflow-hidden rounded-lg"></div>
-                    ) : (
-                        <Button onClick={() => setIsScanning(true)}>Nyalakan Kamera</Button>
-                    )}
-                    <p className="mt-4 text-slate-400 text-sm">Scan QR Undangan</p>
-                </div>
-            ) : (
-                // 2. TAMPILAN DETAIL TAMU & AKSI
+           {/* AREA UTAMA */}
+            
+            {/* 1. TAMPILAN KAMERA (Selalu dirender, hanya disembunyikan pakai CSS) */}
+            <div className={`w-full max-w-md bg-slate-800 p-6 rounded-xl border border-slate-700 text-center ${activeGuest ? 'hidden' : 'block'}`}>
+                
+                {/* INI KUNCI MUTLAKNYA: div #reader TIDAK PERNAH DIHAPUS DARI DOM */}
+                <div id="reader" className={`overflow-hidden rounded-lg w-full ${!isScanning ? 'hidden' : 'block'}`}></div>
+
+                {/* Tombol Nyalakan muncul secara terpisah TANPA menimpa/menghapus #reader */}
+                {!isScanning && (
+                    <Button onClick={() => setIsScanning(true)} className="mt-4 w-full">
+                        Nyalakan Kamera
+                    </Button>
+                )}
+                
+                <p className="mt-4 text-slate-400 text-sm">Scan QR Undangan</p>
+            </div>
+
+            {/* 2. TAMPILAN DETAIL TAMU & AKSI (Hanya muncul jika ada tamu) */}
+            {activeGuest && (
                 <Card className="w-full max-w-md bg-slate-800 border-slate-600">
                     <CardHeader className="bg-slate-950/50 pb-4 text-center">
                         <CardTitle className="text-xl text-amber-500">{activeGuest.name}</CardTitle>
