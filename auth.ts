@@ -18,10 +18,23 @@ export const {
   signIn, 
   signOut 
 } = NextAuth({
-  ...authConfig, // Gabungkan config ringan tadi
+  ...authConfig,
   adapter: PrismaAdapter(prisma) as any, 
   session: { strategy: "jwt" },
-  // Letakkan Providers yang memanggil DB dan Bcrypt DI SINI (Server Environment)
+  
+  // PROTEKSI MUTLAK: Kunci Cookie agar tidak bisa diretas via XSS
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true, 
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    }
+  },
+
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
