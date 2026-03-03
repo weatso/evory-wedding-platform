@@ -4,24 +4,26 @@ import TemplateRenderer from "@/components/templates/TemplateRenderer";
 
 export const revalidate = 60; 
 
-export async function generateStaticParams() {
-  const invitations = await prisma.invitation.findMany({
-    where: { isActive: true },
-    select: { slug: true },
-    take: 100, 
-  });
-  return invitations.map((inv) => ({ slug: inv.slug }));
-}
-
-export default async function InvitationPage({ params }: { params: { slug: string } }) {
-  // Tunggu parameter sebelum mengakses propertinya (Penting di Next.js 15/Turbo)
+// Tambahkan searchParams untuk menangkap ?to=id_tamu
+export default async function InvitationPage({ 
+  params,
+  searchParams
+}: { 
+  params: { slug: string };
+  searchParams: { to?: string };
+}) {
+  // Resolusi parameter (wajib di Next.js 15)
   const resolvedParams = await params;
-  const { slug } = resolvedParams;
+  const resolvedSearchParams = await searchParams;
 
+  const { slug } = resolvedParams;
+  const guestId = resolvedSearchParams.to; // Menangkap ID dari URL
+
+  // 1. Ambil Data Undangan
   const invitationData = await prisma.invitation.findUnique({
     where: { slug, isActive: true },
     include: {
-      template: true, // Data template (jvn-01, dll) ditarik di sini
+      template: true,
       wishes: {
         include: { guest: true },
         orderBy: { createdAt: 'desc' },
@@ -33,12 +35,23 @@ export default async function InvitationPage({ params }: { params: { slug: strin
     return notFound();
   }
 
+  // 2. Ambil Data Tamu (Jika URL memiliki parameter ?to=...)
+  let guestData = null;
+  if (guestId) {
+    guestData = await prisma.guest.findUnique({
+      where: { 
+        id: guestId,
+        invitationId: invitationData.id // Validasi ganda: Pastikan tamu ini benar diundang ke acara ini
+      }
+    });
+  }
+
   return (
     <main className="min-h-screen bg-black w-full overflow-x-hidden">
-      {/* PERBAIKAN: Mengirim data sesuai yang diminta antarmuka TemplateRenderer Anda */}
+      {/* SEKARANG DATA TAMU DIKIRIMKAN, BUKAN NULL LAGI */}
       <TemplateRenderer 
         invitation={invitationData as any} 
-        guest={null} 
+        guest={guestData} 
       />
     </main>
   );
