@@ -13,12 +13,20 @@ export async function getPresignedUploadUrl(
   destination: "client" | "system", // <-- UBAH DI SINI
   folder: string = "general"
 ) {
+  // --- INJEKSI DIAGNOSTIK MULAI ---
+  console.log("=== AUDIT MEMORI VERCEL ===");
+  console.log("1. Destination yang diminta:", destination);
+  console.log("2. R2_CLIENT_BUCKET:", typeof process.env.R2_CLIENT_BUCKET === 'undefined' ? "KOSONG/UNDEFINED" : "TERBACA (Valid)");
+  console.log("3. R2_CLIENT_PUBLIC_URL:", typeof process.env.R2_CLIENT_PUBLIC_URL === 'undefined' ? "KOSONG/UNDEFINED" : "TERBACA (Valid)");
+  console.log("4. R2_TEMPLATE_BUCKET:", typeof process.env.R2_TEMPLATE_BUCKET === 'undefined' ? "KOSONG/UNDEFINED" : "TERBACA (Valid)");
+  console.log("===========================");
+  // --- INJEKSI DIAGNOSTIK SELESAI ---
+
   const session = await auth();
   if (!session || !session.user) {
     throw new Error("Unauthorized Access: Anda tidak memiliki izin.");
   }
 
-  // Jika destination adalah 'system', kita tetap memanggil env R2_TEMPLATE_BUCKET milik Anda
   const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
   const publicUrlBase = destination === "client" ? process.env.R2_CLIENT_PUBLIC_URL : process.env.R2_TEMPLATE_PUBLIC_URL;
 
