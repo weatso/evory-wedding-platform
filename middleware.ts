@@ -2,8 +2,6 @@ import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 import { NextResponse } from "next/server";
 
-// PENTING: Kita panggil NextAuth hanya menggunakan authConfig yang ringan
-// Jangan pernah mengimpor ./auth.ts ke dalam middleware!
 const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
@@ -19,23 +17,34 @@ export default auth((req) => {
 
   // 2. Logic Redirect Terpusat
   if (isAuthRoute && isLoggedIn) {
-    if (userRole === "ADMIN") return NextResponse.redirect(new URL("/admin", nextUrl));
+    if (userRole === "ADMIN" || userRole === "PARTNER") return NextResponse.redirect(new URL("/admin", nextUrl));
     if (userRole === "USHER") return NextResponse.redirect(new URL("/usher", nextUrl));
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
+  // 3. Karantina Wilayah Admin & Partner
   if (isAdminRoute) {
     if (!isLoggedIn) return NextResponse.redirect(new URL("/login", nextUrl));
-    if (userRole !== "ADMIN") return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    // Jika Client atau Usher mencoba masuk /admin, tendang!
+    if (userRole === "CLIENT") return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    if (userRole === "USHER") return NextResponse.redirect(new URL("/usher", nextUrl));
+    
+    // PERTAHANAN ABSOLUT: Partner tidak boleh masuk ke manajemen template pusat
+    if (userRole === "PARTNER" && nextUrl.pathname.startsWith("/admin/templates")) {
+      return NextResponse.redirect(new URL("/admin", nextUrl));
+    }
   }
 
+  // 4. Karantina Wilayah Usher
   if (isUsherRoute) {
     if (!isLoggedIn) return NextResponse.redirect(new URL("/login", nextUrl));
-    if (userRole !== "ADMIN" && userRole !== "USHER") return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    if (userRole === "CLIENT") return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  if (isClientRoute && !isLoggedIn) {
-    return NextResponse.redirect(new URL("/login", nextUrl));
+  // 5. Karantina Wilayah Client
+  if (isClientRoute) {
+    if (!isLoggedIn) return NextResponse.redirect(new URL("/login", nextUrl));
+    if (userRole === "USHER") return NextResponse.redirect(new URL("/usher", nextUrl));
   }
 
   return NextResponse.next();
@@ -43,7 +52,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    // Lindungi matcher agar tidak memblokir file statis dan API internal
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
