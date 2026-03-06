@@ -41,7 +41,7 @@ export default function AppSidebar({ userRole }: { userRole: string }) {
 
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
         
-        {/* KASTA 1: SUPER ADMIN (Melihat Semua) */}
+        {/* 1. BLOK ADMIN (Hanya Super Admin) */}
         {userRole === "ADMIN" && (
             <div>
                 <p className="text-[10px] font-extrabold text-slate-400 uppercase px-3 mb-2 tracking-wider">Super Admin Pusat</p>
@@ -59,6 +59,12 @@ export default function AppSidebar({ userRole }: { userRole: string }) {
                   <Link href="/admin/templates">
                       <Button variant={pathname.includes("/admin/templates") ? "secondary" : "ghost"} className="w-full justify-start text-slate-700">
                           <ImageIcon className="mr-2 h-4 w-4" /> Manajemen Template
+                      </Button>
+                  </Link>
+                  {/* TAMBAHKAN KODE INI */}
+                  <Link href="/admin/assets">
+                      <Button variant={pathname.includes("/admin/assets") ? "secondary" : "ghost"} className="w-full justify-start text-slate-700">
+                          <ImageIcon className="mr-2 h-4 w-4" /> Brankas Aset
                       </Button>
                   </Link>
                 </div>

@@ -9,6 +9,8 @@ import ClientAssetsForm from "./ClientAssetsForm";
 import ClientDetailsForm from "./ClientDetailsForm";
 import DeleteWishButton from "./DeleteWishButton";
 import AutoRefresh from "./live/AutoRefresh"; 
+// PERBAIKAN: Import mutlak untuk komponen galeri
+import ClientTemplateGallery from "@/components/dashboard/ClientTemplateGallery"; 
 
 type Props = {
   searchParams: Promise<{ viewAs?: string }>;
@@ -25,7 +27,7 @@ export default async function DashboardPage(props: Props) {
   
   const targetUserId = (userRole === "ADMIN" && viewAsId) ? viewAsId : session.user.id;
 
-  // 2. FETCH DATA KOMPLIT
+  // 2. FETCH DATA KOMPLIT UNDANGAN
   const invitation = await prisma.invitation.findFirst({
     where: { userId: targetUserId },
     include: {
@@ -49,7 +51,21 @@ export default async function DashboardPage(props: Props) {
     );
   }
 
-  // 3. STATISTIK (Server Side Calculation)
+  // 3. FETCH DAFTAR TEMPLATE AKTIF DARI DATABASE
+  const availableTemplates = await prisma.template.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      thumbnail: true,
+      tier: true,
+      category: { select: { name: true } }
+    },
+    orderBy: { tier: 'desc' }
+  });
+
+  // 4. STATISTIK (Server Side Calculation)
   const totalGuests = invitation.guests.length;
   const totalPaxAllocated = invitation.guests.reduce((sum, g) => sum + g.totalPaxAllocated, 0);
   
@@ -59,16 +75,14 @@ export default async function DashboardPage(props: Props) {
   const declinedCount = invitation.guests.filter(g => g.rsvpStatus === "DECLINED").length;
   const pendingCount = invitation.guests.filter(g => g.rsvpStatus === "PENDING").length;
 
-  // 4. PARSE THEME CONFIG (Untuk ambil wings)
+  // 5. PARSE THEME CONFIG
   const themeConfig = invitation.themeConfig as any || {};
   const initialWings = themeConfig.desktopBackground || null;
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
-      {/* AUTO REFRESH (10 Detik) */}
       <AutoRefresh intervalMs={10000} /> 
 
-      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -92,58 +106,30 @@ export default async function DashboardPage(props: Props) {
         </div>
       </div>
 
-      {/* STATISTIK CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard 
-          title="Total Undangan" 
-          value={totalGuests.toString()} 
-          subValue={`${totalPaxAllocated} Kursi`}
-          desc="Tamu Terdaftar"
-          icon={<Users className="text-blue-600 h-4 w-4" />} 
-        />
-        <StatsCard 
-          title="Konfirmasi Hadir" 
-          value={totalAttendingPax.toString()} 
-          subValue={`${attendingGuests.length} Tamu`}
-          desc="Pax Terkonfirmasi"
-          icon={<UserCheck className="text-green-600 h-4 w-4" />} 
-          trend="positive"
-        />
-        <StatsCard 
-          title="Berhalangan" 
-          value={declinedCount.toString()} 
-          subValue="Tamu"
-          desc="Menolak Hadir"
-          icon={<UserX className="text-red-500 h-4 w-4" />} 
-          trend="negative"
-        />
-        <StatsCard 
-          title="Belum Respon" 
-          value={pendingCount.toString()} 
-          subValue="Tamu"
-          desc="Menunggu RSVP"
-          icon={<Clock className="text-amber-500 h-4 w-4" />} 
-          trend="neutral"
-        />
+        <StatsCard title="Total Undangan" value={totalGuests.toString()} subValue={`${totalPaxAllocated} Kursi`} desc="Tamu Terdaftar" icon={<Users className="text-blue-600 h-4 w-4" />} />
+        <StatsCard title="Konfirmasi Hadir" value={totalAttendingPax.toString()} subValue={`${attendingGuests.length} Tamu`} desc="Pax Terkonfirmasi" icon={<UserCheck className="text-green-600 h-4 w-4" />} trend="positive" />
+        <StatsCard title="Berhalangan" value={declinedCount.toString()} subValue="Tamu" desc="Menolak Hadir" icon={<UserX className="text-red-500 h-4 w-4" />} trend="negative" />
+        <StatsCard title="Belum Respon" value={pendingCount.toString()} subValue="Tamu" desc="Menunggu RSVP" icon={<Clock className="text-amber-500 h-4 w-4" />} trend="neutral" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        {/* KOLOM KIRI: EDIT DATA & ASSETS (PERBAIKAN PROPS) */}
+        {/* KOLOM KIRI */}
         <div className="lg:col-span-2 space-y-6">
           <ClientDetailsForm invitation={invitation} />
            <ClientAssetsForm 
               invitationId={invitation.id}
-              userId={invitation.userId!} // Tanda seru krn pasti ada di tahap ini
+              userId={invitation.userId!}
               initialCover={invitation.coverImageUrl}
               initialGroom={invitation.groomImageUrl}
               initialBride={invitation.brideImageUrl}
-              initialWings={initialWings} // Diambil dari themeConfig di atas
+              initialWings={initialWings}
               initialGallery={invitation.gallery}
            />
         </div>
 
-        {/* KOLOM KANAN: MODERASI UCAPAN */}
+        {/* KOLOM KANAN */}
         <div className="space-y-4 lg:sticky lg:top-8">
           <div className="flex justify-between items-center px-1">
             <div className="flex items-center gap-2">
@@ -163,7 +149,6 @@ export default async function DashboardPage(props: Props) {
                         <div key={wish.id} className="p-4 hover:bg-slate-50 transition group relative">
                         <div className="flex justify-between items-start mb-1 pr-6">
                             <div className="font-bold text-sm text-slate-800">
-                                {/* PERBAIKAN: Gunakan senderName sesuai Schema Prisma */}
                                 {wish.senderName || wish.guest?.name || "Anonim"}
                                 {wish.guest?.category && (
                                     <span className="ml-2 text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
@@ -177,7 +162,6 @@ export default async function DashboardPage(props: Props) {
                         </div>
                         <p className="text-sm text-slate-600 leading-relaxed font-serif">"{wish.message}"</p>
                         
-                        {/* TOMBOL DELETE */}
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <DeleteWishButton wishId={wish.id} />
                         </div>
@@ -197,18 +181,21 @@ export default async function DashboardPage(props: Props) {
             </div>
           </Card>
         </div>
-
       </div>
+
+      {/* GALERI TEMPLATE KLIEN */}
+      <ClientTemplateGallery 
+        invitationId={invitation.id}
+        currentTemplateId={invitation.templateId}
+        clientTier={invitation.packageTier}
+        templates={availableTemplates}
+      />
+
     </div>
   );
 }
 
-// Komponen Stats Card
-function StatsCard({ 
-    title, value, subValue, desc, icon, trend 
-}: { 
-    title: string, value: string, subValue: string, desc: string, icon: React.ReactNode, trend?: 'positive' | 'negative' | 'neutral' 
-}) {
+function StatsCard({ title, value, subValue, desc, icon, trend }: { title: string, value: string, subValue: string, desc: string, icon: React.ReactNode, trend?: 'positive' | 'negative' | 'neutral' }) {
   return (
     <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

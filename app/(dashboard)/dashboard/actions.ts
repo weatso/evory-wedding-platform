@@ -107,6 +107,71 @@ export async function updateGuest(guestId: string, payload: { name: string; what
   }
 }
 
+// --- HIERARKI KASTA PAKET (BUSINESS RULE MUTLAK) ---
+const TIER_RANK: Record<string, number> = {
+  ESSENTIAL: 1,
+  PRESTIGE: 2,
+  ROYAL: 3,
+  CUSTOM: 4,
+};
+
+// 6. UPDATE TEMPLATE UNDANGAN (DENGAN VALIDASI KASTA)
+export async function updateInvitationTemplate(invitationId: string, templateId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const userRole = session.user.role as string;
+
+  // 1. Pertahanan IDOR (Pastikan yang mengganti berhak atas undangan ini)
+  const isOwner = await verifyInvitationOwnership(invitationId, session.user.id, userRole);
+  if (!isOwner) return { error: "Security Breach: Akses ditolak." };
+
+  try {
+    // 2. Ambil data Undangan (untuk melihat kastanya)
+    const invitation = await prisma.invitation.findUnique({
+      where: { id: invitationId },
+      select: { packageTier: true, slug: true }
+    });
+
+    if (!invitation) return { error: "Undangan tidak ditemukan." };
+
+    // 3. Ambil data Template yang dipilih (untuk melihat kastanya)
+    const template = await prisma.template.findUnique({
+      where: { id: templateId },
+      select: { tier: true, name: true }
+    });
+
+    if (!template) return { error: "Template tidak ditemukan di katalog." };
+
+    // 4. VALIDASI ATURAN BISNIS (KASTA TEMPLATE vs KASTA UNDANGAN)
+    const invRank = TIER_RANK[invitation.packageTier] || 1;
+    const tplRank = TIER_RANK[template.tier] || 1;
+
+    // Jika kasta template lebih tinggi dari kasta undangan, TOLAK!
+    if (tplRank > invRank) {
+      return { 
+        error: `Pelanggaran Paket: Undangan ini berada di tier ${invitation.packageTier}, tidak bisa menggunakan template '${template.name}' yang berada di tier ${template.tier}. Silakan upgrade paket klien terlebih dahulu.` 
+      };
+    }
+
+    // 5. Eksekusi Perubahan
+    await prisma.invitation.update({
+      where: { id: invitationId },
+      data: { templateId: templateId }
+    });
+
+    // 6. Hancurkan Cache agar perubahan langsung terlihat
+    revalidatePath("/dashboard");
+    revalidatePath(`/invitation/${invitation.slug}`);
+
+    return { success: true };
+
+  } catch (error) {
+    console.error("Gagal ganti template:", error);
+    return { error: "Terjadi kesalahan sistem saat mengganti template." };
+  }
+}
+
 export async function deleteWish(wishId: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Unauthorized" };
@@ -151,6 +216,8 @@ export async function updateClientDetails(invitationId: string, formData: FormDa
       },
       select: { slug: true }
     });
+
+    
 
     revalidatePath("/dashboard");
     revalidatePath(`/invitation/${inv.slug}`);

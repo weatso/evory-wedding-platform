@@ -1,173 +1,137 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import AssetUploader from "@/components/admin/AssetUploader"; 
-import { listR2Files } from "@/lib/actions/explorer";
-import { deleteFromR2 } from "@/lib/actions/delete";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Copy, Image as ImageIcon, Video, FileJson, Trash2, CheckCircle2 } from "lucide-react";
+import SimpleUploadButton from "@/components/dashboard/SimpleUploadButton";
 import { toast } from "sonner";
+import Image from "next/image";
 
-interface R2FileObject {
-  name: string;
-  key: string;
+type UploadedAsset = {
   url: string;
-  size: number;
-  lastModified: string;
-}
+  name: string;
+  type: "image" | "video" | "lottie";
+};
 
-export default function MediaLibraryPage() {
-  const [files, setFiles] = useState<R2FileObject[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // PERBAIKAN: Ubah "template" menjadi "system"
-  const [destination, setDestination] = useState<"system" | "client">("system");
-  const [folderPath, setFolderPath] = useState("general"); 
+export default function AdminAssetsPage() {
+  const [recentAssets, setRecentAssets] = useState<UploadedAsset[]>([]);
 
-  const fetchFiles = useCallback(async () => {
-    setLoading(true);
-    // Pastikan Server Action listR2Files Anda mendukung parameter "system"
-    const res = await listR2Files(destination as any, folderPath);
-    
-    if (!res.success) {
-      toast.error(res.error);
-    } else {
-      // Urutkan file terbaru di atas
-      const sortedFiles = (res.files || []).sort((a, b) => 
-        new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
-      );
-      setFiles(sortedFiles);
-    }
-    setLoading(false);
-  }, [destination, folderPath]);
+  const handleUploadComplete = (url: string) => {
+    let type: "image" | "video" | "lottie" = "image";
+    if (url.endsWith(".webm") || url.endsWith(".mp4")) type = "video";
+    if (url.endsWith(".json")) type = "lottie";
 
-  useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    const fileName = url.split('/').pop() || "asset-file";
+
+    setRecentAssets((prev) => [{ url, name: fileName, type }, ...prev]);
+    toast.success("Aset berhasil diunggah ke R2!");
+  };
 
   const copyToClipboard = (url: string) => {
     navigator.clipboard.writeText(url);
-    toast.success("URL berhasil disalin ke clipboard!");
+    toast.success("URL Aset berhasil disalin!");
   };
 
-  const handleDelete = async (fileKey: string, fileUrl: string) => {
-    if (!confirm(`Yakin ingin memusnahkan aset ini dari R2? Tindakan ini tidak bisa dibatalkan.`)) return;
-    
-    // Tembak Server Action untuk hard-delete
-    const res = await deleteFromR2(fileUrl, destination as any);
-    
-    if (!res.success) {
-      toast.error(res.error);
-    } else {
-      toast.success("File fisik berhasil dihapus.");
-      fetchFiles(); // Refresh
-    }
+  const removeAssetFromView = (url: string) => {
+    setRecentAssets((prev) => prev.filter((a) => a.url !== url));
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans text-gray-800">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2 text-[#5D4037]">R2 Media Library</h1>
-        <p className="text-gray-500 mb-8">Pusat kontrol CDN Cloudflare untuk System & Aset Client.</p>
+    <div className="p-6 md:p-8 space-y-8 max-w-6xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Brankas Aset Desain</h1>
+          <p className="text-slate-500 mt-1">Upload elemen visual (SVG, PNG, WebM) untuk digunakan oleh Frontend Developer.</p>
+        </div>
+      </div>
 
-        {/* --- 1. AREA UPLOAD --- */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <h2 className="font-bold text-lg mb-4">Upload ke CDN (Bypass Server)</h2>
-          <div className="flex flex-col md:flex-row gap-6 items-start">
-             <div className="flex-1 w-full">
-                <AssetUploader 
-                  destination={destination}
-                  storagePath={folderPath} 
-                  onUploadComplete={() => fetchFiles()} 
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* KOLOM KIRI: UPLOADER */}
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="border-blue-100 shadow-sm">
+            <CardHeader className="bg-blue-50/50 pb-4">
+              <CardTitle className="text-lg text-blue-800">Upload Aset Baru</CardTitle>
+              <CardDescription>File akan masuk ke folder sistem, aman dari data klien.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 flex flex-col items-center gap-4">
+              <div className="w-full p-8 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/20 flex flex-col items-center justify-center text-center">
+                <ImageIcon className="w-12 h-12 text-blue-300 mb-3" />
+                <p className="text-sm font-medium text-slate-600 mb-4">SVG, PNG, WEBP, atau Lottie JSON</p>
+                {/* PERTAHANAN ARSITEKTUR:
+                  Parameter destination="system" dan path yang di-hardcode memastikan 
+                  desainer tidak bisa mengotak-atik folder /users/ milik klien.
+                */}
+                <SimpleUploadButton 
+                  destination="system" 
+                  path={`system/assets/templates/${Date.now()}`} 
+                  onUploadComplete={handleUploadComplete} 
+                  label="Pilih File Aset"
+                  className="w-full"
                 />
-             </div>
-             <div className="w-full md:w-1/3 text-sm bg-slate-50 p-4 rounded border border-slate-200 text-slate-700">
-                <strong>Pengaturan Infrastruktur:</strong>
-                
-                <div className="mt-4">
-                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Target Bucket</label>
-                   <select 
-                     value={destination} 
-                     // PERBAIKAN: Ubah casting menjadi "system" | "client"
-                     onChange={(e) => setDestination(e.target.value as "system" | "client")}
-                     className="block w-full p-2 rounded border border-slate-300 bg-white"
-                   >
-                     {/* PERBAIKAN: Value diubah menjadi "system" */}
-                     <option value="system">System (evory-templates)</option>
-                     <option value="client">Clients (evory-clients)</option>
-                   </select>
-                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                <div className="mt-4">
-                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Struktur Folder</label>
-                   <input 
-                     type="text" 
-                     value={folderPath}
-                     onChange={(e) => setFolderPath(e.target.value)}
-                     placeholder="contoh: javanese/jvn-01/backgrounds"
-                     className="block w-full p-2 rounded border border-slate-300 bg-white font-mono text-xs"
-                   />
-                </div>
-                
-             </div>
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
+            <strong>Instruksi Desainer:</strong>
+            <ul className="list-decimal ml-4 mt-2 space-y-1">
+              <li>Upload gapura, ornamen, atau background di sini.</li>
+              <li>Klik tombol <b>Copy URL Frontend</b> pada file yang berhasil diunggah.</li>
+              <li>Kirimkan URL tersebut ke tim Frontend untuk dimasukkan ke dalam kode.</li>
+            </ul>
           </div>
         </div>
 
-        {/* --- 2. GALLERY LIST --- */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-           <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="font-bold text-lg">Daftar File ({files.length})</h2>
-                <p className="text-xs text-slate-400 font-mono mt-1">/{destination}/{folderPath}</p>
-              </div>
-              <button onClick={fetchFiles} className="text-sm bg-slate-100 px-4 py-2 rounded hover:bg-slate-200 transition">
-                Refresh CDN List
-              </button>
-           </div>
+        {/* KOLOM KANAN: HASIL UPLOAD */}
+        <div className="lg:col-span-2 space-y-4">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-600" /> Aset Sesi Ini
+          </h3>
+          
+          {recentAssets.length === 0 ? (
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 flex flex-col items-center justify-center text-slate-400">
+              <p>Belum ada aset yang diunggah pada sesi ini.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {recentAssets.map((asset) => (
+                <Card key={asset.url} className="overflow-hidden border-slate-200 shadow-sm group">
+                  <div className="h-40 bg-slate-100 relative border-b border-slate-200 flex items-center justify-center overflow-hidden">
+                    {asset.type === "image" && <Image src={asset.url} alt={asset.name} fill className="object-contain p-4" />}
+                    {asset.type === "video" && <video src={asset.url} autoPlay loop muted className="w-full h-full object-cover opacity-50" />}
+                    {asset.type === "lottie" && <FileJson className="w-16 h-16 text-slate-300" />}
 
-           {loading ? (
-             <div className="text-center py-10 text-gray-400 animate-pulse">Memindai Cloudflare R2...</div>
-           ) : files.length === 0 ? (
-             <div className="text-center py-10 text-gray-400 bg-gray-50 rounded border border-dashed">
-               Bucket/Folder ini kosong.
-             </div>
-           ) : (
-             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {files.map((file) => {
-                  const isImage = file.name.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i);
-                  
-                  return (
-                    <div key={file.key} className="group relative border rounded-lg p-2 hover:border-slate-400 transition-colors bg-white">
-                       <div className="aspect-square bg-slate-100 rounded overflow-hidden mb-2 relative flex items-center justify-center">
-                          {isImage ? (
-                            <img src={file.url} className="w-full h-full object-cover" alt={file.name} loading="lazy" />
-                          ) : (
-                            <span className="text-xs text-slate-500 font-mono uppercase break-all px-2 text-center">
-                               {file.name.split('.').pop() || "FILE"}
-                            </span>
-                          )}
-                       </div>
+                    <Badge className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm">
+                      {asset.type.toUpperCase()}
+                    </Badge>
 
-                       <p className="text-xs font-bold truncate mb-1 text-slate-700" title={file.name}>{file.name}</p>
-                       <p className="text-[10px] text-slate-400 mb-3">{(file.size / 1024).toFixed(1)} KB</p>
-
-                       <div className="flex flex-col gap-1">
-                          <button 
-                            onClick={() => copyToClipboard(file.url)}
-                            className="bg-slate-800 text-white text-xs py-1.5 rounded hover:bg-slate-700 transition"
-                          >
-                            Copy URL
-                          </button>
-                          <button 
-                             onClick={() => handleDelete(file.key, file.url)}
-                             className="text-red-500 text-[10px] hover:underline text-center mt-1 py-1"
-                          >
-                             Hard Delete
-                          </button>
-                       </div>
-                    </div>
-                  );
-                })}
-             </div>
-           )}
+                    <button 
+                      onClick={() => removeAssetFromView(asset.url)}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Sembunyikan dari daftar ini"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <CardContent className="p-4 bg-white">
+                    <p className="text-xs font-mono text-slate-500 truncate mb-3" title={asset.name}>
+                      {asset.name}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={() => copyToClipboard(asset.url)}
+                    >
+                      <Copy className="w-4 h-4 mr-2" /> Copy URL Frontend
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
