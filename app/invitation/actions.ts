@@ -57,7 +57,7 @@ export async function submitRsvp(
     // 2. LOGIKA DATABASE (TRANSACTION)
     await prisma.$transaction(async (tx) => {
       
-      // KASUS A: TAMU LAMA (Punya ID Unik dari Link)
+     // KASUS A: TAMU LAMA (Punya ID Unik dari Link)
       if (cleanData.guestId) {
         const existingGuest = await tx.guest.findUnique({
           where: { id: cleanData.guestId }
@@ -65,17 +65,23 @@ export async function submitRsvp(
 
         if (!existingGuest) throw new Error("Data tamu tidak ditemukan.");
 
+        // PERTAHANAN IDOR MUTLAK: Pastikan tamu yang diedit BENAR-BENAR milik undangan ini!
+        if (existingGuest.invitationId !== cleanData.invitationId) {
+          throw new Error("Security Breach: ID Tamu tidak memiliki otoritas pada acara ini.");
+        }
+
         await tx.guest.update({
           where: { id: cleanData.guestId },
           data: {
             rsvpStatus: cleanData.status,
             pax: cleanData.status === "ATTENDING" ? existingGuest.totalPaxAllocated : 0,
             isCheckedIn: cleanData.status === "ATTENDING" ? undefined : false,
+            // Jika tamu memasukkan nama baru, simpan. Jika kosong, biarkan nama asli.
             name: cleanData.name && cleanData.name !== existingGuest.name ? cleanData.name : undefined, 
           }
         });
         finalGuestId = cleanData.guestId;
-      } 
+      }
       
       // KASUS B: TAMU BARU (Publik / Link Umum)
       else {

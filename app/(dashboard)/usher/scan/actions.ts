@@ -5,7 +5,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma"; 
 import { revalidatePath } from "next/cache";
 
-// Helper: Ambil Nama Acara & PIN (PIN tidak dikirim ke client demi keamanan, dicek di server)
 export async function getEventDetail(invitationId: string) {
     return await prisma.invitation.findUnique({
         where: { id: invitationId },
@@ -13,24 +12,54 @@ export async function getEventDetail(invitationId: string) {
     });
 }
 
-// 1. CARI TAMU (Read Only)
+// Helper Internal: Ambil Afiliasi Partner dari User Saat Ini
+async function getEffectivePartnerId(userId: string, userRole: string) {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, partnerId: true }
+    });
+    // Jika dia PARTNER, maka ID dia sendiri adalah patokannya. 
+    // Jika dia USHER, maka partnerId atasan dia yang jadi patokan.
+    return userRole === "PARTNER" ? user?.id : user?.partnerId;
+}
+
+// 1. CARI TAMU (Dengan Karantina Kepemilikan)
 export async function getGuestByCode(code: string, eventId: string) {
     const session = await auth();
     if (!session?.user) return { error: "Sesi habis." };
 
+    const userRole = session.user.role as string;
+    const userId = session.user.id as string;
+    const effectivePartnerId = await getEffectivePartnerId(userId, userRole);
+
+    // Tarik data tamu sekaligus intip siapa pemilik acara ini
     const guest = await prisma.guest.findUnique({
         where: { guestCode: code },
-        include: { invitation: { select: { id: true } } } // Cek relasi
+        include: { 
+            invitation: { 
+                select: { 
+                    id: true,
+                    user: { select: { partnerId: true } } // Rantai B2B
+                } 
+            } 
+        }
     });
 
     if (!guest) return { error: "Kode Tamu tidak ditemukan." };
     if (guest.invitationId !== eventId) return { error: "⛔ SALAH ACARA!" };
 
+    // PERTAHANAN MUTLAK IDOR: Pastikan WO/Partner-nya cocok
+    if (userRole === "USHER" || userRole === "PARTNER") {
+        const invitationOwner = guest.invitation.user;
+        if (!invitationOwner || invitationOwner.partnerId !== effectivePartnerId) {
+            return { error: "Security Breach: Tamu ini bukan dari klien di bawah naungan WO Anda." };
+        }
+    }
+
     return { guest };
 }
 
-// 2. PROSES CHECK-IN (Write dengan Logic PIN)
-// Mode: 'FIRST' (pertama kali) atau 'ADD' (susulan)
+// 2. PROSES CHECK-IN (Dengan Karantina Kepemilikan)
 export async function processCheckIn(
     guestId: string, 
     inputPax: number, 
@@ -38,36 +67,47 @@ export async function processCheckIn(
     pin?: string
 ) {
     const session = await auth();
-    // Validasi Role Usher/Admin
-    if (!session?.user || (session.user.role !== "USHER" && session.user.role !== "ADMIN")) {
+    if (!session?.user || (session.user.role !== "USHER" && session.user.role !== "ADMIN" && session.user.role !== "PARTNER")) {
         return { error: "Akses Ditolak." };
     }
 
+    const userRole = session.user.role as string;
+    const userId = session.user.id as string;
+    const effectivePartnerId = await getEffectivePartnerId(userId, userRole);
+
     const guest = await prisma.guest.findUnique({
         where: { id: guestId },
-        include: { invitation: true }
+        include: { 
+            invitation: {
+                include: { user: { select: { partnerId: true } } }
+            } 
+        }
     });
 
     if (!guest) return { error: "Data tamu hilang." };
 
+    // PERTAHANAN MUTLAK IDOR SEBELUM TRANSAKSI WRITE
+    if (userRole === "USHER" || userRole === "PARTNER") {
+        const invitationOwner = guest.invitation.user;
+        if (!invitationOwner || invitationOwner.partnerId !== effectivePartnerId) {
+            return { error: "Pelanggaran Otoritas: Anda mencoba mengubah data entitas lain." };
+        }
+    }
+
     // --- HITUNG LOGIKA PAX ---
     let newPaxTotal = inputPax;
-    
-    // Jika Mode ADD (Susulan), pax dijumlahkan dengan yang sudah ada
     if (mode === 'ADD') {
         newPaxTotal = guest.pax + inputPax;
     }
 
     // --- LOGIKA VALIDASI PIN ---
     const isOverQuota = newPaxTotal > guest.totalPaxAllocated;
-    const isUpdateData = mode === 'ADD'; // Sesuai request: Update data susulan butuh PIN
+    const isUpdateData = mode === 'ADD'; 
 
-    // Jika Over Quota ATAU Update Data (Susulan), WAJIB pakai PIN
     if (isOverQuota || isUpdateData) {
         if (!pin) {
             return { error: "PIN diperlukan untuk aksi ini.", requirePin: true };
         }
-        // Cek Kesesuaian PIN
         if (pin !== guest.invitation.checkInPin) {
             return { error: "PIN SALAH! Akses ditolak.", requirePin: true };
         }
@@ -78,11 +118,10 @@ export async function processCheckIn(
             where: { id: guestId },
             data: {
                 isCheckedIn: true, 
-                checkInTime: new Date(), // Update waktu checkin terakhir
+                checkInTime: new Date(), 
                 pax: newPaxTotal,
-                // PERBAIKAN: Masukkan ID dari sesi user ke dalam Foreign Key
-                checkedInById: session.user.id,
-                lastUpdatedById: session.user.id // Menyimpan jejak siapa yang update terakhir
+                checkedInById: userId,
+                lastUpdatedById: userId 
             }
         });
 
@@ -94,7 +133,7 @@ export async function processCheckIn(
             msg: mode === 'ADD' ? `Berhasil tambah +${inputPax} pax` : `Check-in Sukses (${inputPax} pax)`
         };
     } catch (e) {
-        console.error("Check-in Error:", e); // Tambahkan log error agar Anda tahu jika DB gagal
+        console.error("Check-in Error:", e); 
         return { error: "Database Error" };
     }
 }

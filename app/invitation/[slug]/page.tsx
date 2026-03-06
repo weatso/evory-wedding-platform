@@ -38,7 +38,8 @@ export default async function InvitationPage({
   // 2. Ambil Data Tamu (Jika URL memiliki parameter ?to=...)
   let guestData = null;
   if (guestId) {
-    guestData = await prisma.guest.findUnique({
+    // HARUS menggunakan findFirst, bukan findUnique, karena kita memfilter berdasarkan 2 parameter
+    guestData = await prisma.guest.findFirst({
       where: { 
         id: guestId,
         invitationId: invitationData.id // Validasi ganda: Pastikan tamu ini benar diundang ke acara ini
