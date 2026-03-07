@@ -1,12 +1,11 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createInvitationAction } from "../actions";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { createInvitationAction } from "../../../(dashboard)/admin/actions";
 
 export default async function AdminCreateInvitationPage() {
     const session = await auth();

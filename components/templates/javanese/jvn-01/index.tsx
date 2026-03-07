@@ -9,6 +9,9 @@ import BaseSectionWrapper from "../../base/BaseSectionWrapper";
 import BaseSplash from "../../base/BaseSplash";
 import BaseLoveStory from "../../base/BaseLoveStory";
 import BaseLiveStream from "../../base/BaseLiveStream";
+import BaseCouple from "../../base/BaseCouple";
+import BaseGift from "../../base/BaseGift";
+import BaseGallery from "../../base/BaseGallery";
 
 // ASSETS SEMENTARA
 const ASSETS = "https://cksyuviluwywysyjcouu.supabase.co/storage/v1/object/public/wedding-assets/system-asset/jvn-01";
@@ -251,26 +254,16 @@ export default function Jvn01({ invitation, guest }: Jvn01Props) {
 
             {/* SECTION 3: COUPLE */}
             <BaseSectionWrapper id="couple" className="text-center py-10 px-6 space-y-16 relative md:ml-auto md:mr-0">
-               <h2 className="font-judul text-3xl font-bold text-[#5D4037]">Mempelai</h2>
-               <div className="flex flex-col items-center space-y-4">
-                  <GalleryFrame src={invitation.groomImageUrl || "https://placehold.co/400x400/png?text=Groom"} alt="Groom" className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]" />
-                  <div>
-                     <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.groomName}</h3>
-                     <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">
-                        Putra Bpk. {invitation.groomFather || "..."} <br /> & Ibu {invitation.groomMother || "..."}
-                     </p>
-                  </div>
-               </div>
-               <div className="text-3xl text-[#8D6E63] font-serif">&</div>
-               <div className="flex flex-col items-center space-y-4">
-                  <GalleryFrame src={invitation.brideImageUrl || "https://placehold.co/400x400/png?text=Bride"} alt="Bride" className="w-48 h-48 rounded-full border-4 border-[#D7CCC8]" />
-                  <div>
-                     <h3 className="font-judul text-3xl font-bold text-[#5D4037]">{invitation.brideName}</h3>
-                     <p className="text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide">
-                        Putri Bpk. {invitation.brideFather || "..."} <br /> & Ibu {invitation.brideMother || "..."}
-                     </p>
-                  </div>
-               </div>
+               <BaseCouple
+                  invitation={invitation}
+                  styles={{
+                     title: "font-judul text-3xl font-bold text-[#5D4037]",
+                     imageFrame: "relative w-48 h-48 rounded-full overflow-hidden border-4 border-[#D7CCC8]",
+                     nameText: "font-judul text-3xl font-bold text-[#5D4037]",
+                     parentText: "text-xs text-[#8D6E63] mt-2 font-bold uppercase tracking-wide",
+                     divider: "text-3xl text-[#8D6E63] font-serif"
+                  }}
+               />
             </BaseSectionWrapper>
 
             {/* SECTION 4: EVENT */}
@@ -381,52 +374,35 @@ export default function Jvn01({ invitation, guest }: Jvn01Props) {
                </div>
             </BaseSectionWrapper>
 
-            {/* SECTION 8: GIFT (PUBLIK BISA MELIHAT SESUAI REQUEST) */}
-            {envelopes.length > 0 && (
-               <BaseSectionWrapper id="gift" className="text-center py-16 px-6 bg-[#EFEBE9]/30 md:ml-auto md:mr-0">
-                  <h3 className="font-judul font-bold text-[#5D4037] mb-6 text-xl">Tanda Kasih</h3>
-                  <p className="text-sm text-slate-600 mb-8 leading-relaxed max-w-xs mx-auto">Doa restu Anda merupakan karunia yang sangat berarti bagi kami.</p>
-
-                  <div className="space-y-6">
-                     {envelopes.map((env, idx) => (
-                        <div key={idx} className="border border-[#D7CCC8] rounded-xl p-6 bg-white shadow-sm max-w-xs mx-auto w-full relative overflow-hidden">
-                           <Heart className="absolute top-[-20px] right-[-20px] w-24 h-24 text-[#EFEBE9] opacity-50" />
-                           <div className="relative z-10">
-                              <div className="font-bold text-lg mb-2 text-slate-800">{env.bankName}</div>
-                              <p className="text-xl font-mono tracking-widest mb-1 text-[#5D4037] select-all">{env.accountNumber}</p>
-                              <p className="text-xs text-gray-500 mb-4 uppercase">a.n {env.accountHolder}</p>
-
-                              {env.qrisUrl && (
-                                 <div className="mb-4 flex justify-center">
-                                    <img src={env.qrisUrl} alt="QRIS" className="w-40 h-40 object-contain rounded-lg border p-2 bg-white" />
-                                 </div>
-                              )}
-
-                              <button
-                                 className="w-full flex items-center justify-center gap-2 text-xs border border-[#8D6E63] text-[#8D6E63] px-4 py-2 rounded-full hover:bg-[#8D6E63] hover:text-white transition"
-                                 onClick={() => handleCopy(env.accountNumber)}
-                              >
-                                 <Copy className="w-3.5 h-3.5" /> Salin Rekening
-                              </button>
-                           </div>
-                        </div>
-                     ))}
-                  </div>
-               </BaseSectionWrapper>
-            )}
+            {/* SECTION 8: GIFT */}
+            <BaseSectionWrapper id="gift" className="text-center py-16 px-6 bg-[#EFEBE9]/30 md:ml-auto md:mr-0">
+               <BaseGift
+                  envelopes={envelopes}
+                  guest={guest}
+                  styles={{
+                     title: "font-judul font-bold text-[#5D4037] mb-6 text-xl",
+                     subtitle: "text-sm text-slate-600 mb-8 leading-relaxed max-w-xs mx-auto",
+                     card: "border border-[#D7CCC8] rounded-xl p-6 bg-white shadow-sm max-w-xs mx-auto w-full relative overflow-hidden",
+                     bankName: "font-bold text-lg mb-2 text-slate-800",
+                     accountNumber: "text-xl font-mono tracking-widest mb-1 text-[#5D4037] select-all",
+                     accountHolder: "text-xs text-gray-500 mb-4 uppercase",
+                     copyButton: "w-full flex items-center justify-center gap-2 text-xs border border-[#8D6E63] text-[#8D6E63] px-4 py-2 rounded-full hover:bg-[#8D6E63] hover:text-white transition"
+                  }}
+                  cardOrnament={<Heart className="absolute top-[-20px] right-[-20px] w-24 h-24 text-[#EFEBE9] opacity-50" />}
+               />
+            </BaseSectionWrapper>
 
             {/* SECTION 9: GALLERY */}
             <BaseSectionWrapper id="gallery" className="py-20 px-4 relative md:ml-auto md:mr-0">
-               <h3 className="font-judul font-bold text-[#5D4037] mb-8 text-center text-2xl">Galeri Foto</h3>
-               <div className="grid grid-cols-2 gap-3">
-                  {invitation.gallery?.length > 0 ? (
-                     invitation.gallery.map((url: string, i: number) => (
-                        <GalleryFrame key={i} src={url} alt={`Gallery ${i}`} className={i % 3 === 0 ? "col-span-2 aspect-video" : "aspect-[3/4]"} />
-                     ))
-                  ) : (
-                     <p className="col-span-2 text-center text-xs text-gray-400">Belum ada foto galeri.</p>
-                  )}
-               </div>
+               <BaseGallery
+                  images={invitation.gallery || []}
+                  styles={{
+                     title: "font-judul font-bold text-[#5D4037] mb-8 text-center text-2xl",
+                     gridContainer: "grid grid-cols-2 gap-3",
+                     imageFrame: "relative overflow-hidden rounded-xl shadow-md bg-stone-200",
+                     imageSpan: "col-span-2 aspect-video"
+                  }}
+               />
             </BaseSectionWrapper>
 
             {/* SECTION 10: FOOTER */}
