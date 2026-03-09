@@ -6,6 +6,7 @@ import GuestRowActions from "../GuestRowActions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
+import ExportGuestsButton from "../ExportGuestsButton"; // <--- IMPORT INI
 
 type Props = {
   searchParams: Promise<{ viewAs?: string }>;
@@ -45,9 +46,14 @@ export default async function GuestsPage(props: Props) {
 
         {/* KOLOM KANAN: TABEL */}
         <div className="lg:col-span-2 space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-slate-800">Daftar Tamu</h2>
-                <Badge variant="outline">{invitation.guests.length} Data</Badge>
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800">Daftar Tamu</h2>
+                    <p className="text-xs text-slate-500 mt-1">Total: <Badge variant="secondary" className="ml-1">{invitation.guests.length} Data</Badge></p>
+                </div>
+                
+                {/* ---> TOMBOL MESIN EXPORT DITANAM DI SINI <--- */}
+                <ExportGuestsButton guests={invitation.guests} slug={invitation.slug} />
             </div>
 
             <Card className="border-slate-200 shadow-md overflow-hidden">

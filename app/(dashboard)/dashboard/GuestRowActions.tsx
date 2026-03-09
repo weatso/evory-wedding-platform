@@ -90,7 +90,7 @@ export default function GuestRowActions({ guest, invitationSlug }: { guest: Gues
     const getInvitationLink = () => {
         const baseUrl = window.location.origin;
         // Format: domain.com/invitation/slug?u=KODE
-        return `${baseUrl}/invitation/${invitationSlug}?u=${guest.guestCode}`;
+        return `${baseUrl}/invitation/${invitationSlug}?to=${guest.guestCode}`;
     };
 
     const copyInvitationLink = () => {

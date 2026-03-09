@@ -84,44 +84,6 @@ function ScannerContent() {
             }
         };
     }, [isScanning, activeGuest, eventId]);// 2. Logic Scanner (Diperbaiki: Proteksi Hardware Lock)
-    useEffect(() => {
-        if (!isScanning || activeGuest || !eventId) return;
-        
-        // Buat instance scanner
-        const scanner = new Html5QrcodeScanner("reader", { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0 
-        }, false);
-        
-        let isScannerCleared = false; // Flag pelindung
-
-        scanner.render(
-            (decodedText) => {
-                if (isScannerCleared) return;
-                isScannerCleared = true; // Kunci agar tidak membaca 2 kali
-                
-                // Matikan hardware dengan aman DULU
-                scanner.clear().then(() => {
-                    setIsScanning(false);
-                    handleLookup(decodedText);
-                }).catch((e) => {
-                    console.error("Gagal matikan hardware:", e);
-                    setIsScanning(false);
-                    handleLookup(decodedText);
-                });
-            }, 
-            (error) => {} // Abaikan log error tiap frame
-        );
-
-        return () => { 
-            // Cleanup mutlak saat komponen ditinggalkan
-            if (!isScannerCleared) {
-                isScannerCleared = true;
-                scanner.clear().catch(() => {}); 
-            }
-        };
-    }, [isScanning, activeGuest, eventId]);
 
     // HANDLER: Cari Tamu
     async function handleLookup(code: string) {
