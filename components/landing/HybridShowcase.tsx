@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import PhoneFrame from "./PhoneFrame";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
-// --- TIPE DATA ---
 type Template = {
   id: string;
   name: string;
@@ -22,198 +21,141 @@ type Template = {
 type Category = {
   id: string;
   name: string;
-  description?: string | null;
   templates: Template[];
 };
 
 export default function HybridShowcase({ categories }: { categories: Category[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  // LOGIKA SCROLL VERTIKAL (GANTI KATEGORI)
-  // Tinggi container = Jumlah Kategori * 100vh.
-  // Artinya user butuh 1x scroll layar penuh untuk ganti kategori.
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"],
-  });
+  const firstTemplateImg = categories[0]?.templates[0]?.thumbnail || "";
+  const [activeThumbnail, setActiveThumbnail] = useState<string>(firstTemplateImg);
 
-  // State
-  const [activeCatIndex, setActiveCatIndex] = useState(0); // Index Kategori (Scroll)
-  const [activeTplIndex, setActiveTplIndex] = useState(0); // Index Template (Manual Click)
-
-  // 1. Deteksi Scroll untuk Ganti Kategori
-  useEffect(() => {
-    const unsubscribe = scrollYProgress.on("change", (latest) => {
-      const totalCats = categories.length;
-      // Rumus: Progress 0-1 dipetakan ke jumlah kategori
-      const newCatIndex = Math.min(
-        Math.max(Math.floor(latest * totalCats), 0),
-        totalCats - 1
-      );
-
-      // Jika kategori berubah, reset template index ke 0 (awal lagi)
-      if (newCatIndex !== activeCatIndex) {
-        setActiveCatIndex(newCatIndex);
-        setActiveTplIndex(0); 
-      }
-    });
-    return () => unsubscribe();
-  }, [scrollYProgress, categories.length, activeCatIndex]);
-
-  // Data Aktif
-  const currentCategory = categories[activeCatIndex];
-  const currentTemplate = currentCategory?.templates[activeTplIndex];
-
-  // Navigasi Manual (Next/Prev Template)
-  const nextTemplate = () => {
-    if (activeTplIndex < currentCategory.templates.length - 1) {
-      setActiveTplIndex((prev) => prev + 1);
+  // Fungsi untuk menggulir mulus ke kategori (Anchor Link)
+  const scrollToCategory = (id: string) => {
+    const element = document.getElementById(`cat-${id}`);
+    if (element) {
+      // Menggunakan offset agar tidak tertutup oleh sub-navbar yang sticky
+      const y = element.getBoundingClientRect().top + window.scrollY - 150;
+      window.scrollTo({ top: y, behavior: "smooth" });
     }
   };
-
-  const prevTemplate = () => {
-    if (activeTplIndex > 0) {
-      setActiveTplIndex((prev) => prev - 1);
-    }
-  };
-
-  if (!currentCategory || !currentTemplate) return null;
 
   return (
-    // CONTAINER TINGGI UNTUK SCROLL TRACKING
-    <section 
-      ref={containerRef} 
-      className="relative bg-black" 
-      style={{ height: `${categories.length * 150}vh` }} // 150vh per kategori biar agak lama scrollnya
-    >
+    <section className="relative bg-[#F9F8F4] flex flex-col md:flex-row">
       
-      {/* STICKY VIEWPORT (Layar yang diam) */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col lg:flex-row items-center justify-center">
-        
-        {/* =========================================
-            BAGIAN KIRI: PHONE FRAME (Sticky)
-            Berubah saat Kategori ganti OR Template diklik
-        ========================================= */}
-        <div className="w-full lg:w-1/2 h-[45vh] lg:h-full flex items-center justify-center pt-8 lg:pt-0 relative z-10">
-          
-          {/* Wrapper PhoneFrame dengan ukuran responsif */}
-          <div className="scale-[0.65] sm:scale-75 lg:scale-100 origin-center transition-transform duration-500">
-            <PhoneFrame>
-              <div className="w-full h-full relative bg-stone-900 overflow-hidden">
-                <AnimatePresence mode="popLayout" custom={activeTplIndex}>
-                  <motion.img
-                    key={`${currentCategory.id}-${currentTemplate.id}`} 
-                    src={currentTemplate.thumbnail}
-                    alt={currentTemplate.name}
-                    className="w-full h-full object-cover absolute inset-0"
-                    
-                    // Animasi Slide Horizontal (Carousel Effect)
-                    initial={{ x: 300, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    exit={{ x: -300, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                </AnimatePresence>
-                
-                {/* Overlay Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-              </div>
-            </PhoneFrame>
-          </div>
+      {/* =========================================
+          KIRI (33%): PHONE FRAME (STICKY)
+      ========================================= */}
+      <div className="hidden md:flex md:w-[35%] lg:w-[33%] sticky top-0 h-screen bg-[#07303F] items-center justify-center overflow-hidden border-r border-slate-200 relative">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-[#E5C185]/20 blur-[100px] rounded-full z-0 pointer-events-none" />
 
-          {/* Glow Effect di belakang HP */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] lg:w-[500px] lg:h-[500px] bg-amber-600/20 blur-[100px] rounded-full -z-10" />
+        <div className="relative z-10 scale-[0.80] lg:scale-[0.90] origin-center">
+          <PhoneFrame>
+            <div className="w-full h-full relative bg-black overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.img
+                  key={activeThumbnail}
+                  src={activeThumbnail}
+                  alt="Template Preview"
+                  className="w-full h-full object-cover absolute inset-0"
+                  initial={{ opacity: 0, scale: 1.05 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                />
+              </AnimatePresence>
+            </div>
+          </PhoneFrame>
+        </div>
+      </div>
+
+      {/* =========================================
+          KANAN (66%): KATALOG DENGAN STICKY SUB-NAV
+      ========================================= */}
+      <div className="w-full md:w-[65%] lg:w-[67%] relative">
+        
+        {/* STICKY SUB-NAVBAR KATEGORI (Lengket di atas saat digulir) */}
+        <div className="sticky top-0 z-40 bg-[#F9F8F4]/95 backdrop-blur-md pt-12 pb-4 px-6 md:px-16 border-b border-slate-200 shadow-sm">
+           <h2 className="font-sans font-bold text-3xl md:text-5xl text-[#07303F] mb-6">The Collection</h2>
+           
+           {/* Anchor Links Kategori */}
+           <div className="flex gap-6 overflow-x-auto hide-scrollbar snap-x">
+             {categories.map((cat) => (
+               <button 
+                 key={cat.id} 
+                 onClick={() => scrollToCategory(cat.id)}
+                 className="snap-start text-[10px] md:text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-[#07303F] whitespace-nowrap pb-2 border-b-2 border-transparent hover:border-[#E5C185] transition-all"
+               >
+                 {cat.name}
+               </button>
+             ))}
+           </div>
         </div>
 
-
-        {/* =========================================
-            BAGIAN KANAN: KONTEN TEKS & KONTROL (Sticky)
-        ========================================= */}
-        <div className="w-full lg:w-1/2 h-[55vh] lg:h-full flex flex-col justify-start lg:justify-center px-6 lg:px-24 pb-12 lg:pb-0 relative z-20">
-          
-          {/* Animasi Transisi Teks (Fade In/Out saat konten berubah) */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${currentCategory.id}-${currentTemplate.id}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-4 lg:space-y-6 text-center lg:text-left"
-            >
+        {/* DAFTAR KAROSEL KATEGORI */}
+        <div className="py-12 px-0 flex flex-col gap-16 md:gap-24">
+          {categories.map((cat) => (
+            <div key={cat.id} id={`cat-${cat.id}`} className="flex flex-col pt-4">
               
-              {/* Header Kategori */}
-              <div className="flex flex-col lg:flex-row items-center lg:items-start gap-2 lg:gap-4 justify-center lg:justify-start">
-                 <Badge variant="outline" className="text-amber-500 border-amber-500/30 tracking-widest uppercase text-[10px] lg:text-xs px-3 py-1">
-                   {currentCategory.name} Collection
-                 </Badge>
-                 <span className="text-stone-500 text-xs font-mono">
-                   Template {activeTplIndex + 1} of {currentCategory.templates.length}
-                 </span>
+              {/* Judul Kategori & Jumlah */}
+              <div className="px-6 md:px-16 flex items-center gap-4 mb-6">
+                 <h3 className="font-sans font-bold text-xl md:text-2xl text-[#07303F]">{cat.name}</h3>
+                 <span className="h-[1px] flex-1 bg-slate-200"></span>
+                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">{cat.templates.length} Designs</span>
               </div>
 
-              {/* Judul Template */}
-              <h2 className="text-3xl lg:text-6xl font-serif text-white leading-tight">
-                {currentTemplate.name}
-              </h2>
-
-              {/* Deskripsi */}
-              <p className="text-stone-400 text-sm lg:text-lg leading-relaxed max-w-md mx-auto lg:mx-0 min-h-[60px] lg:min-h-[80px]">
-                {currentTemplate.description || "Desain premium dengan fitur undangan digital terlengkap."}
-              </p>
-
-              {/* Tombol Kontrol Manual (Next/Prev) */}
-              <div className="flex items-center justify-center lg:justify-start gap-4 py-2 lg:py-4">
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={prevTemplate}
-                  disabled={activeTplIndex === 0}
-                  className="rounded-full border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 disabled:opacity-30"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </Button>
-
-                <div className="flex gap-2">
-                   {currentCategory.templates.map((_, idx) => (
+              {/* KAROSEL HORIZONTAL NETFLIX-STYLE */}
+              <div className="w-full overflow-x-auto pb-8 snap-x snap-mandatory hide-scrollbar pl-6 md:pl-16 pr-6">
+                 <div className="flex gap-4 md:gap-6 w-max">
+                   {cat.templates.map((tpl) => (
                      <div 
-                       key={idx} 
-                       className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeTplIndex ? 'w-8 bg-amber-500' : 'w-2 bg-stone-700'}`}
-                     />
+                       key={tpl.id} 
+                       className="w-[260px] md:w-[280px] shrink-0 snap-start flex flex-col group cursor-pointer"
+                       onMouseEnter={() => setActiveThumbnail(tpl.thumbnail)} // Pemicu perubahan gambar di HP saat di-hover/disentuh
+                     >
+                       
+                       {/* Thumbnail Kotak untuk Mobile / Fallback */}
+                       <div className="md:hidden relative w-full aspect-[4/5] bg-slate-100 rounded-lg overflow-hidden mb-4 border border-slate-200 shadow-sm">
+                          <Image src={tpl.thumbnail} alt={tpl.name} fill className="object-cover" />
+                       </div>
+
+                       {/* Kotak Area Hover Desktop (Tanpa Gambar Asli karena sudah ada di iPhone Kiri) */}
+                       <div className="hidden md:flex relative w-full h-[120px] bg-slate-100/50 rounded-lg overflow-hidden mb-4 border border-slate-200 hover:border-[#E5C185] transition-colors items-center justify-center group-hover:bg-[#07303F] group-hover:shadow-lg">
+                          <div className="text-center p-4">
+                             <span className="text-slate-400 group-hover:text-[#E5C185] text-[10px] uppercase tracking-widest font-bold block mb-1 transition-colors">Hover to Preview</span>
+                             <span className="text-[#07303F] group-hover:text-white text-xs font-medium transition-colors">On Device</span>
+                          </div>
+                       </div>
+
+                       {/* Detail Teks */}
+                       <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-bold text-base md:text-lg text-[#07303F] group-hover:text-[#E5C185] transition-colors line-clamp-1">{tpl.name}</h4>
+                            {tpl.isPremium && <span className="text-[9px] font-bold text-[#E5C185] uppercase tracking-widest">Premium Edition</span>}
+                          </div>
+                       </div>
+                       
+                       <p className="text-xs text-slate-500 line-clamp-2 mb-4 h-8">{tpl.description}</p>
+
+                       {/* Tombol Aksi */}
+                       <div className="flex gap-2 mt-auto">
+                          <Button asChild className="flex-1 bg-[#07303F] text-white hover:bg-[#07303F]/90 rounded-sm text-[10px] uppercase tracking-widest font-bold h-9">
+                             <Link href={tpl.previewUrl || "#"} target="_blank">
+                               Live Preview
+                             </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="icon" className="h-9 w-9 border-slate-300 text-slate-500 rounded-sm hover:text-[#E5C185] hover:border-[#E5C185] shrink-0">
+                             <Link href={`https://wa.me/6281234567890?text=Halo%20Admin,%20konsultasi%20template%20${tpl.name}`} target="_blank">
+                               <MessageCircle className="w-4 h-4" />
+                             </Link>
+                          </Button>
+                       </div>
+
+                     </div>
                    ))}
-                </div>
-
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={nextTemplate}
-                  disabled={activeTplIndex === currentCategory.templates.length - 1}
-                  className="rounded-full border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 disabled:opacity-30"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </Button>
+                 </div>
               </div>
 
-              {/* Action Buttons (Konsultasi & Preview) */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-2 justify-center lg:justify-start">
-                <Button asChild className="rounded-full bg-white text-black hover:bg-stone-200">
-                   <Link href={currentTemplate.previewUrl || "#"} target="_blank">
-                     Live Preview <ArrowRight className="ml-2 w-4 h-4" />
-                   </Link>
-                </Button>
-                <Button asChild variant="outline" className="rounded-full border-stone-600 text-white hover:bg-stone-800">
-                   <Link 
-                      href={`https://wa.me/6281234567890?text=Halo%20Admin,%20saya%20mau%20konsultasi%20template%20*${currentTemplate.name}*`}
-                      target="_blank"
-                   >
-                     <MessageCircle className="mr-2 w-4 h-4" /> Konsultasi
-                   </Link>
-                </Button>
-              </div>
-
-            </motion.div>
-          </AnimatePresence>
-
+            </div>
+          ))}
         </div>
 
       </div>

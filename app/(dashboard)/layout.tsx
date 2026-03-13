@@ -7,12 +7,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* SIDEBAR FIXED */}
+    <div className="min-h-screen bg-slate-50 flex w-full">
       <AppSidebar userRole={session.user.role} />
       
-      {/* MAIN CONTENT AREA (Digeser 64 unit ke kanan karena sidebar) */}
-      <main className="flex-1 ml-64 p-4 md:p-8 overflow-x-hidden">
+      {/* LOGIKA ABSOLUT: 
+        flex-1: Ambil seluruh sisa ruang.
+        md:ml-64: Beri jarak selebar sidebar di Desktop.
+        min-w-0: JANGAN PERNAH menembus batas lebar viewport.
+        overflow-x-hidden: Matikan gulir horizontal selamanya.
+      */}
+      <main className="flex-1 w-full min-w-0 md:ml-64 pt-16 md:pt-0 overflow-x-hidden">
         {children}
       </main>
     </div>
