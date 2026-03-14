@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import FilterSidebar from "@/components/collection/FilterSidebar"; 
 import { ArrowLeft, LayoutDashboard } from "lucide-react";
+import { Suspense } from "react";
 
 export default async function CollectionPage({
   searchParams,
@@ -74,9 +75,13 @@ export default async function CollectionPage({
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-10 lg:gap-16">
           
           {/* SIDEBAR */}
-          <div className="w-full md:w-64 shrink-0">
+        <div className="w-full md:w-64 shrink-0">
+          <Suspense fallback={
+            <div className="w-full h-96 bg-slate-100 animate-pulse rounded-xl border border-slate-200" />
+          }>
             <FilterSidebar categories={categories} />
-          </div>
+          </Suspense>
+        </div>
 
           {/* AREA ETALASE GRID */}
           <main className="flex-1">
