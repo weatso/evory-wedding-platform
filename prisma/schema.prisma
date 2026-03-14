@@ -220,6 +220,10 @@ model TemplateCategory {
   name        String     // Javanese, Modern, Minimalist
   slug        String     @unique // javanese-series
   description String?
+
+  // TAMBAHKAN INI: Kontrol kurasi untuk Landing Page
+  isFeatured  Boolean    @default(false)
+  sortOrder   Int        @default(0) // Untuk mengatur urutan manual di Etalase
   
   templates   Template[] // Relasi One-to-Many
   
@@ -232,6 +236,9 @@ model Template {
   name        String           // Jvn-01 (Kraton)
   slug        String           @unique // jvn-01 (Ini yang dipakai di URL)
   description String?          // Deskripsi singkat
+
+  // TAMBAHKAN INI: Tidak semua template dalam kategori unggulan layak tampil di depan
+  isFeatured  Boolean          @default(false)
 
   // Mengunci template ke tier tertentu
   tier        PackageTier      @default(ESSENTIAL)

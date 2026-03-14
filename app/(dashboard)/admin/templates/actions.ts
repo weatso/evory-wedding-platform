@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { PackageTier } from "@prisma/client"; // WAJIB DIIMPORT UNTUK ENUM
 
 // ==========================================
 // SCHEMAS (VALIDASI DATA)
@@ -14,9 +15,11 @@ const TemplateSchema = z.object({
   slug: z.string().min(3, "Slug minimal 3 karakter"),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
   thumbnail: z.string().min(1, "Thumbnail wajib diupload"),
-  // Field opsional (bisa null/undefined)
   previewUrl: z.string().optional(),
   description: z.string().optional(),
+  // TAMBAHAN BARU UNTUK MENANGKAP DATA DARI UI
+  tier: z.string().optional(), 
+  isFeatured: z.string().optional(),
 });
 
 const CategorySchema = z.object({
@@ -35,7 +38,7 @@ export async function createTemplate(formData: FormData) {
     return { error: "Unauthorized Access" };
   }
 
-  // 2. Ambil Data dari Form
+  // 2. Ambil Data dari Form (Termasuk data baru)
   const rawData = {
     name: formData.get("name"),
     slug: formData.get("slug"),
@@ -43,6 +46,8 @@ export async function createTemplate(formData: FormData) {
     thumbnail: formData.get("thumbnail"),
     previewUrl: formData.get("previewUrl"),
     description: formData.get("description"),
+    tier: formData.get("tier"),
+    isFeatured: formData.get("isFeatured"),
   };
 
   // 3. Validasi
@@ -52,10 +57,19 @@ export async function createTemplate(formData: FormData) {
     return { error: "Data tidak valid. Cek kembali inputan Anda." };
   }
 
-  const { name, slug, categoryId, thumbnail, previewUrl, description } = validated.data;
+  const { name, slug, categoryId, thumbnail, previewUrl, description, tier, isFeatured } = validated.data;
 
   try {
-    // 4. Simpan ke Database
+    // Pengecekan Duplikasi Slug sebelum Prisma Crash
+    const existingTemplate = await prisma.template.findUnique({
+      where: { slug },
+    });
+
+    if (existingTemplate) {
+      return { error: `Slug "${slug}" sudah digunakan. Gunakan nama/slug lain.` };
+    }
+
+    // 4. Konversi Data & Simpan ke Database
     await prisma.template.create({
       data: {
         name,
@@ -63,23 +77,24 @@ export async function createTemplate(formData: FormData) {
         categoryId,
         thumbnail,
         description: description || "", 
-        previewUrl: previewUrl || `/invitation/demo-${slug}`,
-        // Default values untuk styling (bisa diedit nanti)
+        previewUrl: previewUrl || `/preview/${slug}`, // Saya ubah agar mengarah ke route preview Anda
         previewText: name.substring(0, 3).toUpperCase(), 
         bgColor: "bg-stone-900",
         isActive: true,
+        // LOGIKA BARU DI SINI
+        tier: (tier as PackageTier) || PackageTier.ESSENTIAL,
+        isFeatured: isFeatured === "true", // Konversi string dari FormData menjadi boolean
       },
     });
 
-    // 5. Refresh Halaman
+    // 5. Refresh Halaman secara Komprehensif
     revalidatePath("/admin/templates");
-    revalidatePath("/"); // Update landing page
+    revalidatePath("/collection"); // Update Gudang
+    revalidatePath("/"); // Update Etalase Landing Page
+    
     return { success: true };
 
   } catch (error: any) {
-    if (error.code === 'P2002') {
-      return { error: "Slug URL ini sudah dipakai template lain." };
-    }
     console.error("Create Template Error:", error);
     return { error: "Gagal menyimpan template ke database." };
   }
@@ -92,6 +107,7 @@ export async function deleteTemplate(id: string) {
   try {
     await prisma.template.delete({ where: { id } });
     revalidatePath("/admin/templates");
+    revalidatePath("/collection");
     revalidatePath("/");
     return { success: true };
   } catch (error) {
@@ -116,8 +132,9 @@ export async function createCategory(formData: FormData) {
   if (!validated.success) return { error: "Nama kategori wajib diisi." };
 
   const { name, description } = validated.data;
-  // Bikin slug otomatis dari nama (contoh: "Javanese Series" -> "javanese-series")
-  const slug = name.toLowerCase().replace(/\s+/g, '-') + "-" + Date.now().toString().slice(-4);
+  
+  // Format slug lebih bersih tanpa random string panjang di belakang jika memungkinkan
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
   try {
     await prisma.templateCategory.create({
@@ -125,7 +142,10 @@ export async function createCategory(formData: FormData) {
     });
     revalidatePath("/admin/templates");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+       return { error: "Kategori dengan nama/slug ini sudah ada." };
+    }
     return { error: "Gagal membuat kategori." };
   }
 }
@@ -137,8 +157,9 @@ export async function deleteCategory(id: string) {
   try {
     await prisma.templateCategory.delete({ where: { id } });
     revalidatePath("/admin/templates");
+    revalidatePath("/collection");
     return { success: true };
   } catch (error) {
-    return { error: "Gagal menghapus kategori (Mungkin masih ada template di dalamnya)." };
+    return { error: "Gagal menghapus kategori (Mungkin masih ada template yang terikat)." };
   }
 }
