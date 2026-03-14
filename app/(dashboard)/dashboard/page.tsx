@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Users, UserCheck, UserX, MessageSquare, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,8 @@ import ClientAssetsForm from "./ClientAssetsForm";
 import ClientDetailsForm from "./ClientDetailsForm";
 import DeleteWishButton from "./DeleteWishButton";
 import AutoRefresh from "./live/AutoRefresh"; 
-// PERBAIKAN: Import mutlak untuk komponen galeri
 import ClientTemplateGallery from "@/components/dashboard/ClientTemplateGallery"; 
+import { cn } from "@/lib/utils"; // Diperlukan untuk komponen StatsCard baru
 
 type Props = {
   searchParams: Promise<{ viewAs?: string }>;
@@ -20,7 +20,9 @@ export default async function DashboardPage(props: Props) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  // 1. LOGIC ADMIN VIEW AS CLIENT
+  // ==========================================
+  // 1. LOGIC ADMIN VIEW AS CLIENT (OTAK)
+  // ==========================================
   const searchParams = await props.searchParams;
   const viewAsId = searchParams.viewAs;
   const userRole = session.user.role;
@@ -42,10 +44,12 @@ export default async function DashboardPage(props: Props) {
   if (!invitation) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] text-center space-y-4">
-        <h1 className="text-2xl font-bold text-slate-800">Undangan Belum Dibuat</h1>
+        <h1 className="text-2xl font-serif italic text-[#07303F]">The Vault is Empty</h1>
         <p className="text-slate-500">Akun ini belum memiliki data undangan pernikahan.</p>
         {userRole === "ADMIN" && (
-           <Button asChild><a href="/admin/create-invitation">Buat Undangan</a></Button>
+           <Button className="bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074] font-bold uppercase tracking-widest text-xs" asChild>
+             <a href="/admin/create-invitation">Inisiasi Mahakarya</a>
+           </Button>
         )}
       </div>
     );
@@ -79,44 +83,50 @@ export default async function DashboardPage(props: Props) {
   const themeConfig = invitation.themeConfig as any || {};
   const initialWings = themeConfig.desktopBackground || null;
 
+  // ==========================================
+  // 6. RENDER ANTARMUKA (WAJAH)
+  // ==========================================
   return (
-    <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 lg:space-y-12 pb-20">
       <AutoRefresh intervalMs={10000} /> 
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
+      {/* HEADER DASBOR PREMIUM */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-200 pb-8">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-             <Badge variant="outline" className="text-xs uppercase tracking-wider text-slate-500">
+          <div className="flex items-center gap-3 mb-3">
+             <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-[#07303F] border-[#07303F]/30 bg-transparent rounded-sm px-3 py-1">
                 {invitation.slug}
              </Badge>
-             {userRole === "ADMIN" && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Mode Admin</Badge>}
+             {userRole === "ADMIN" && <Badge className="bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074] rounded-sm text-[10px] font-bold uppercase tracking-widest">Observer Mode</Badge>}
           </div>
-          <h1 className="text-3xl font-serif font-bold text-slate-800">
+          <h1 className="text-4xl md:text-5xl font-serif italic font-bold text-[#07303F] mb-1">
             {invitation.groomNick} & {invitation.brideNick}
           </h1>
-          <p className="text-slate-500 text-sm">Dashboard Pernikahan</p>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Executive Dashboard</p>
         </div>
-        <div className="flex gap-2">
-            <Button variant="outline" asChild>
-                <a href={`/invitation/${invitation.slug}`} target="_blank">Lihat Website</a>
-            </Button>
-            <Button className="bg-slate-900 text-white hover:bg-slate-800" asChild>
-                <a href="/dashboard/guests">Buku Tamu</a>
-            </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Undangan" value={totalGuests.toString()} subValue={`${totalPaxAllocated} Kursi`} desc="Tamu Terdaftar" icon={<Users className="text-blue-600 h-4 w-4" />} />
-        <StatsCard title="Konfirmasi Hadir" value={totalAttendingPax.toString()} subValue={`${attendingGuests.length} Tamu`} desc="Pax Terkonfirmasi" icon={<UserCheck className="text-green-600 h-4 w-4" />} trend="positive" />
-        <StatsCard title="Berhalangan" value={declinedCount.toString()} subValue="Tamu" desc="Menolak Hadir" icon={<UserX className="text-red-500 h-4 w-4" />} trend="negative" />
-        <StatsCard title="Belum Respon" value={pendingCount.toString()} subValue="Tamu" desc="Menunggu RSVP" icon={<Clock className="text-amber-500 h-4 w-4" />} trend="neutral" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        {/* KOLOM KIRI */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="flex gap-3 w-full md:w-auto shrink-0 mt-4 md:mt-0">
+            <Button variant="outline" className="flex-1 md:flex-none border-[#07303F]/20 text-[#07303F] hover:bg-[#07303F] hover:text-[#F9F8F4] text-xs font-bold uppercase tracking-widest h-12 rounded-sm transition-all" asChild>
+                <a href={`/invitation/${invitation.slug}`} target="_blank">View Live</a>
+            </Button>
+            <Button className="flex-1 md:flex-none bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074] text-xs font-bold uppercase tracking-widest h-12 rounded-sm transition-all shadow-lg shadow-[#E5C185]/20 border-0" asChild>
+                <a href="/dashboard/guests">Guest Book</a>
+            </Button>
+        </div>
+      </div>
+
+      {/* STATISTIK KARTU PREMIUM */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <StatsCard title="Total Invites" value={totalGuests.toString()} subValue={`${totalPaxAllocated} Seats`} desc="Registered" icon={<Users className="text-[#07303F] h-4 w-4" />} />
+        <StatsCard title="Attending" value={totalAttendingPax.toString()} subValue={`${attendingGuests.length} Guests`} desc="Confirmed" icon={<UserCheck className="text-[#E5C185] h-4 w-4" />} highlight />
+        <StatsCard title="Declined" value={declinedCount.toString()} subValue="Guests" desc="Unavailable" icon={<UserX className="text-slate-400 h-4 w-4" />} />
+        <StatsCard title="Pending" value={pendingCount.toString()} subValue="Guests" desc="Awaiting RSVP" icon={<Clock className="text-amber-600 h-4 w-4" />} />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+        
+        {/* KOLOM KIRI: Form Manajerial */}
+        <div className="xl:col-span-2 space-y-8">
           <ClientDetailsForm invitation={invitation} />
            <ClientAssetsForm 
               invitationId={invitation.id}
@@ -129,40 +139,40 @@ export default async function DashboardPage(props: Props) {
            />
         </div>
 
-        {/* KOLOM KANAN */}
-        <div className="space-y-4 lg:sticky lg:top-8">
+        {/* KOLOM KANAN: Ucapan & Doa */}
+        <div className="space-y-4 sticky top-10">
           <div className="flex justify-between items-center px-1">
             <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-slate-800" />
-                <h2 className="text-lg font-bold text-slate-800">Ucapan & Doa</h2>
+                <MessageSquare className="h-4 w-4 text-[#07303F]" />
+                <h2 className="text-lg font-bold text-[#07303F]">Wishes & Greetings</h2>
             </div>
-            <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+            <Badge variant="secondary" className="bg-slate-200 text-[#07303F] font-bold">
                 {invitation.wishes.length}
             </Badge>
           </div>
           
-          <Card className="border-slate-200 shadow-sm overflow-hidden h-[600px] flex flex-col">
+          <Card className="border-slate-200 shadow-sm overflow-hidden h-[600px] flex flex-col bg-white">
             <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
                 {invitation.wishes.length > 0 ? (
-                  <div className="divide-y divide-slate-50">
+                  <div className="divide-y divide-slate-100">
                     {invitation.wishes.map((wish) => (
-                        <div key={wish.id} className="p-4 hover:bg-slate-50 transition group relative">
-                        <div className="flex justify-between items-start mb-1 pr-6">
-                            <div className="font-bold text-sm text-slate-800">
+                        <div key={wish.id} className="p-5 hover:bg-slate-50 transition group relative">
+                        <div className="flex justify-between items-start mb-2 pr-6">
+                            <div className="font-bold text-sm text-[#07303F]">
                                 {wish.senderName || wish.guest?.name || "Anonim"}
                                 {wish.guest?.category && (
-                                    <span className="ml-2 text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-[#E5C185] bg-[#07303F] px-1.5 py-0.5 rounded-sm">
                                         {wish.guest.category}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-[10px] text-slate-400 shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
                                 {new Date(wish.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
                             </span>
                         </div>
-                        <p className="text-sm text-slate-600 leading-relaxed font-serif">"{wish.message}"</p>
+                        <p className="text-sm text-slate-600 leading-relaxed font-serif italic">"{wish.message}"</p>
                         
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <DeleteWishButton wishId={wish.id} />
                         </div>
                         </div>
@@ -176,8 +186,8 @@ export default async function DashboardPage(props: Props) {
                   </div>
                 )}
             </div>
-            <div className="p-3 bg-slate-50 border-t border-slate-100 text-[10px] text-center text-slate-400">
-                Hapus ucapan yang mengandung SPAM atau kata kasar.
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-[10px] font-bold uppercase tracking-widest text-center text-slate-400">
+                Hapus ucapan yang mengandung SPAM
             </div>
           </Card>
         </div>
@@ -195,20 +205,28 @@ export default async function DashboardPage(props: Props) {
   );
 }
 
-function StatsCard({ title, value, subValue, desc, icon, trend }: { title: string, value: string, subValue: string, desc: string, icon: React.ReactNode, trend?: 'positive' | 'negative' | 'neutral' }) {
+// KOMPONEN STATS CARD KHUSUS PREMIUM
+function StatsCard({ title, value, subValue, desc, icon, highlight = false }: { title: string, value: string, subValue: string, desc: string, icon: React.ReactNode, highlight?: boolean }) {
   return (
-    <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold text-slate-800">{value}</div>
-        <div className="flex items-center gap-2 mt-1">
-             <span className="text-xs font-medium text-slate-600">{subValue}</span>
-             <span className="text-[10px] text-slate-400">• {desc}</span>
+    <div className={cn(
+      "p-6 rounded-xl border transition-all duration-300",
+      highlight 
+        ? "bg-[#07303F] text-[#F9F8F4] border-[#07303F] shadow-xl shadow-[#07303F]/10" 
+        : "bg-white text-[#07303F] border-slate-200 shadow-sm hover:shadow-md hover:border-[#E5C185]/50"
+    )}>
+      <div className="flex flex-row items-center justify-between mb-4">
+        <h3 className={cn("text-[10px] font-bold uppercase tracking-widest", highlight ? "text-[#E5C185]" : "text-slate-400")}>{title}</h3>
+        <div className={cn("p-2 rounded-full", highlight ? "bg-[#F9F8F4]/10" : "bg-[#F9F8F4]")}>
+          {icon}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div>
+        <div className="text-3xl md:text-4xl font-serif italic font-bold leading-none mb-2">{value}</div>
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+             <span className={cn("text-[10px] font-bold uppercase tracking-wider", highlight ? "text-white" : "text-slate-600")}>{subValue}</span>
+             <span className={cn("text-[10px] uppercase tracking-wider", highlight ? "text-[#E5C185]/70" : "text-slate-400")}>• {desc}</span>
+        </div>
+      </div>
+    </div>
   );
 }
