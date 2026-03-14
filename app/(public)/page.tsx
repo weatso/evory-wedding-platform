@@ -38,7 +38,7 @@ export default async function LandingPage() {
       <DynamicNavbar />
 
       {/* SECTION 1: THE DARK VAULT (Dibuat Sticky agar tertutup oleh Gallery) */}
-      <div className="relative h-screen sticky top-0 overflow-hidden bg-[#07303F] -z-100">
+      <div className="relative h-screen sticky top-0 overflow-hidden bg-[#07303F] z-0">
         <section className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
           
           {/* Efek Cahaya */}
@@ -94,17 +94,15 @@ export default async function LandingPage() {
           </section>
         )}
         
-        {/* Tombol Penyambung ke Gudang di akhir Etalase */}
-        {categories.length > 0 && (
-          <div className="pb-24 flex justify-center">
-            <Link href="/collection" className="group">
-              <div className="border border-[#07303F]/20 text-[#07303F] px-8 py-3 rounded-sm font-bold flex items-center justify-center gap-3 hover:bg-[#07303F] hover:text-[#F9F8F4] transition-all uppercase tracking-widest text-xs">
-                <span>View Full Collection</span>
-                <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform" />
-              </div>
-            </Link>
-          </div>
-        )}
+        {/* Tombol Penyambung ke Gudang di akhir Etalase (Selalu Tampil) */}
+        <div className="pb-24 pt-12 flex justify-center relative z-30">
+          <Link href="/collection" className="group">
+            <div className="border border-[#07303F]/20 text-[#07303F] px-8 py-3 rounded-sm font-bold flex items-center justify-center gap-3 hover:bg-[#07303F] hover:text-[#F9F8F4] transition-all uppercase tracking-widest text-xs">
+              <span>View Full Collection</span>
+              <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform" />
+            </div>
+          </Link>
+        </div>
 
         <footer className="h-24 flex flex-col items-center justify-center text-slate-400 text-[10px] uppercase tracking-widest border-t border-slate-200 bg-[#F9F8F4]">
           <p>© 2026 Evory Platform</p>
