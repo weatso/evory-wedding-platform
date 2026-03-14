@@ -96,22 +96,51 @@ export default function AppSidebar({ userRole }: { userRole: string }) {
         {/* MENU UTAMA */}
         <nav className="flex-1 py-4 flex flex-col gap-8 overflow-y-auto overflow-x-hidden custom-scrollbar">
           
+          {/* MENU SUPER ADMIN */}
           {userRole === "ADMIN" && (
             <div className="px-4">
                 {!isCollapsed && <p className="text-[9px] font-bold text-[#E5C185]/50 uppercase mb-3 tracking-[0.2em] ml-2">Super Admin</p>}
                 <div className="space-y-1">
-                  <Link href="/admin">
-                      <Button variant="ghost" className={cn("w-full transition-all text-xs font-bold tracking-wide h-10", isCollapsed ? "justify-center px-0" : "justify-start px-4", pathname === "/admin" ? "bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074]" : "text-slate-300 hover:bg-[#E5C185]/10 hover:text-[#E5C185]")}>
-                          <Building2 className={cn("h-4 w-4 shrink-0", !isCollapsed && "mr-3")} /> 
-                          {!isCollapsed && <span>Partner Network</span>}
-                      </Button>
-                  </Link>
-                  <Link href="/admin/templates">
-                      <Button variant="ghost" className={cn("w-full transition-all text-xs font-bold tracking-wide h-10", isCollapsed ? "justify-center px-0" : "justify-start px-4", pathname.includes("/admin/templates") ? "bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074]" : "text-slate-300 hover:bg-[#E5C185]/10 hover:text-[#E5C185]")}>
-                          <ImageIcon className={cn("h-4 w-4 shrink-0", !isCollapsed && "mr-3")} /> 
-                          {!isCollapsed && <span>Template Registry</span>}
-                      </Button>
-                  </Link>
+                  {[
+                    { name: "Partner Network", href: "/admin", icon: Building2 },
+                    { name: "Global Users", href: "/admin/users", icon: Users },
+                    { name: "Template Registry", href: "/admin/templates", icon: ImageIcon },
+                    { name: "Asset Vault", href: "/admin/assets", icon: ShieldCheck },
+                  ].map((menu) => {
+                    // Gunakan exact match untuk /admin agar tidak bentrok dengan sub-route
+                    const isActive = menu.href === "/admin" ? pathname === menu.href : pathname.includes(menu.href);
+                    return (
+                      <Link key={menu.href} href={menu.href}>
+                          <Button variant="ghost" className={cn("w-full transition-all text-xs font-bold tracking-wide h-10", isCollapsed ? "justify-center px-0" : "justify-start px-4", isActive ? "bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074]" : "text-slate-300 hover:bg-[#E5C185]/10 hover:text-[#E5C185]")}>
+                              <menu.icon className={cn("h-4 w-4 shrink-0", !isCollapsed && "mr-3", isActive ? "text-[#07303F]" : "text-slate-400")} /> 
+                              {!isCollapsed && <span className="truncate">{menu.name}</span>}
+                          </Button>
+                      </Link>
+                    );
+                  })}
+                </div>
+            </div>
+          )}
+
+          {/* MENU PARTNER (WEDDING ORGANIZER) */}
+          {userRole === "PARTNER" && (
+            <div className="px-4">
+                {!isCollapsed && <p className="text-[9px] font-bold text-[#E5C185]/50 uppercase mb-3 tracking-[0.2em] ml-2">Partner Workspace</p>}
+                <div className="space-y-1">
+                  {[
+                    { name: "My Clients", href: "/admin", icon: Briefcase },
+                    { name: "My Ushers", href: "/admin/users", icon: Users },
+                  ].map((menu) => {
+                    const isActive = menu.href === "/admin" ? pathname === menu.href : pathname.includes(menu.href);
+                    return (
+                      <Link key={menu.href} href={menu.href}>
+                          <Button variant="ghost" className={cn("w-full transition-all text-xs font-bold tracking-wide h-10", isCollapsed ? "justify-center px-0" : "justify-start px-4", isActive ? "bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074]" : "text-slate-300 hover:bg-[#E5C185]/10 hover:text-[#E5C185]")}>
+                              <menu.icon className={cn("h-4 w-4 shrink-0", !isCollapsed && "mr-3", isActive ? "text-[#07303F]" : "text-slate-400")} /> 
+                              {!isCollapsed && <span className="truncate">{menu.name}</span>}
+                          </Button>
+                      </Link>
+                    );
+                  })}
                 </div>
             </div>
           )}
@@ -136,7 +165,7 @@ export default function AppSidebar({ userRole }: { userRole: string }) {
             </div>
           )}
         </nav>
-
+        
         {/* FOOTER SIDEBAR (Akses & Tombol Lipat) */}
         <div className="border-t border-[#E5C185]/10 p-4">
           <button 

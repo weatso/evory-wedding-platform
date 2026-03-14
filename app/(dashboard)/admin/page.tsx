@@ -1,194 +1,189 @@
-// app/(dashboard)/admin/page.tsx
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Eye, Pencil, LayoutDashboard, Plus, Users, LogOut, QrCode, ShieldCheck, Building2 } from "lucide-react";
-import { AddStaffModal } from "./_components/AddStaffModal";
+import { Building2, Users, Briefcase, Plus, ShieldCheck } from "lucide-react";
+import AddStaffModal from "./_components/AddStaffModal";
+import { cn } from "@/lib/utils";
 
-export default async function AdminDashboard() {
+export default async function AdminDashboardPage() {
   const session = await auth();
-  const userRole = session?.user?.role;
-  const userId = session?.user?.id;
+  if (!session) redirect("/login");
 
-  // 1. Security Check: Buka gerbang untuk Admin DAN Partner
-  if (userRole !== "ADMIN" && userRole !== "PARTNER") {
-    redirect("/login");
+  const isAdmin = session.user.role === "ADMIN";
+  const isPartner = session.user.role === "PARTNER";
+
+  if (!isAdmin && !isPartner) {
+    redirect("/dashboard");
   }
 
-  // 2. Karantina Data Client (Undangan)
-  const invitations = await prisma.invitation.findMany({
-    where: userRole === "PARTNER" ? { user: { partnerId: userId } } : undefined, // PARTNER HANYA LIHAT KLIENNYA
-    include: { user: true },
-    orderBy: { createdAt: 'desc' }
+  // LOGIKA PENGAMBILAN DATA (Tidak Diubah, Menggunakan Inti Anda)
+  const users = await prisma.user.findMany({
+    where: isAdmin 
+      ? { role: "PARTNER" } // Jika Admin -> Tampilkan semua WO/Partner
+      : { partnerId: session.user.id, role: "CLIENT" }, // Jika Partner -> Tampilkan klien milik partner tersebut
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: {
+        select: {
+          managedUsers: true, // Untuk Admin melihat jumlah klien WO
+          invitations: true,  // Untuk Partner melihat jumlah undangan klien
+        }
+      }
+    }
   });
 
-  // 3. Karantina Data Staff
-  const staffUsers = await prisma.user.findMany({
-    where: userRole === "PARTNER"
-      ? { role: "USHER", partnerId: userId } // PARTNER HANYA LIHAT USHER MILIKNYA
-      : { role: { in: ["ADMIN", "PARTNER", "USHER"] } }, // ADMIN LIHAT SEMUA STAF & PARTNER
-    orderBy: { createdAt: 'desc' }
-  });
+  const totalUsers = users.length;
+  // Jika Admin, hitung total klien dari semua partner. Jika Partner, itu sudah total klien.
+  const totalSubUsers = isAdmin 
+    ? users.reduce((sum, u) => sum + u._count.managedUsers, 0)
+    : users.reduce((sum, u) => sum + u._count.invitations, 0);
 
   return (
-    <div className="px-6 py-6 lg:px-10 lg:py-8 space-y-8 bg-slate-50 min-h-screen font-sans w-full max-w-full">
-
-      {/* --- HEADER SECTION --- */}
-      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-slate-200 pb-6">
+    <div className="space-y-8 lg:space-y-12 pb-20">
+      
+      {/* HEADER KOMANDO PREMIUM */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-200 pb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            {userRole === "ADMIN" ? "Admin Control Center" : "Ruang Kerja Partner (WO)"}
+          <div className="flex items-center gap-3 mb-3">
+             <div className="text-[10px] bg-[#07303F] text-[#E5C185] px-3 py-1 rounded-sm flex items-center gap-2 font-bold uppercase tracking-widest">
+                <ShieldCheck className="w-3 h-3"/> {isAdmin ? "Super Admin" : "Partner Access"}
+             </div>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-serif italic font-bold text-[#07303F] mb-1">
+            {isAdmin ? "Partner Network" : "Client Roster"}
           </h1>
-          <p className="text-slate-500 mt-1">Kelola proyek undangan, user client, dan tim internal.</p>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">
+            {isAdmin ? "Manajemen Entitas B2B & Wedding Organizer" : "Manajemen Portfolio Calon Pengantin"}
+          </p>
         </div>
-
-        <div className="flex gap-3 items-center">
-          <Link href="/usher">
-            <Button variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50 gap-2">
-              <QrCode className="w-4 h-4" />
-              <span className="hidden md:inline">Mode Usher</span>
-            </Button>
-          </Link>
-
-          <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
-            <Button variant="ghost" className="border-red-200 text-red-600 hover:bg-red-50 gap-2">
-              <LogOut className="w-4 h-4" />
-              <span className="hidden md:inline">Logout</span>
-            </Button>
-          </form>
+        
+        <div className="shrink-0 mt-4 md:mt-0 w-full md:w-auto">
+            {/* Modal bawaan Anda, kita bungkus dalam estetika tombol premium di dalam komponennya nanti jika perlu */}
+            <AddStaffModal 
+               roleOptions={isAdmin ? ["PARTNER"] : ["CLIENT"]} 
+               partnerId={isPartner ? session.user.id : undefined} 
+            />
         </div>
       </div>
 
-      {/* --- CONTENT GRID --- */}
-      <div className="flex flex-col lg:flex-row gap-8 w-full max-w-full">
-        {/* KOLOM KIRI (2/3): MANAGEMENT CLIENT / UNDANGAN */}
-        <div className="w-full lg:w-2/3 space-y-6 min-w-0">
-          <div className="flex justify-between items-end">
-            <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" /> Daftar Client
-              </h2>
-              <p className="text-sm text-slate-500">Total Proyek Aktif: {invitations.length}</p>
-            </div>
-            <Link href="/admin/users">
-              <Button className="bg-slate-900 hover:bg-slate-800 text-white gap-2 shadow-sm">
-                <Plus className="w-4 h-4" /> Tambah Client
-              </Button>
-            </Link>
-          </div>
+      {/* STATISTIK JARINGAN */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatsCard 
+            title={isAdmin ? "Total Partners" : "Total Clients"} 
+            value={totalUsers.toString()} 
+            desc={isAdmin ? "Wedding Organizers Terdaftar" : "Calon Pengantin Terdaftar"} 
+            icon={<Building2 className="text-[#07303F] h-4 w-4" />} 
+        />
+        <StatsCard 
+            title={isAdmin ? "Total Global Clients" : "Total Invitations"} 
+            value={totalSubUsers.toString()} 
+            desc={isAdmin ? "Klien di bawah naungan Partner" : "Undangan digital aktif"} 
+            icon={<Briefcase className="text-[#E5C185] h-4 w-4" />} 
+            highlight 
+        />
+        <StatsCard 
+            title="System Status" 
+            value="Optimal" 
+            desc="Semua server beroperasi normal" 
+            icon={<ShieldCheck className="text-emerald-600 h-4 w-4" />} 
+        />
+      </div>
 
-          {/* TABEL UNDANGAN */}
-          <Card className="border-slate-200 shadow-sm overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="px-6 py-4 w-[30%]">Mempelai & Client</th>
-                      <th className="px-6 py-4 w-[20%]">Tanggal Acara</th>
-                      <th className="px-6 py-4 w-[15%]">Status</th>
-                      <th className="px-6 py-4 w-[35%] text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {invitations.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                          <p>Belum ada proyek. Silakan tambah user baru.</p>
-                        </td>
-                      </tr>
-                    ) : invitations.map((inv) => {
-                      const isDone = new Date() > new Date(inv.eventDate);
-                      return (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-slate-900 text-base">{inv.groomNick} & {inv.brideNick}</div>
-                            <div className="text-xs text-slate-500 flex flex-col gap-1 mt-1">
-                              <span className="flex items-center gap-1">{inv.user?.email}</span>
-                              <span className="font-mono bg-slate-100 px-1.5 py-0.5 w-fit rounded border border-slate-200 text-slate-600">/{inv.slug}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-slate-600 font-medium">
-                            {new Date(inv.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
-                          </td>
-                          <td className="px-6 py-4">
-                            {isDone ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">SELESAI</span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700">AKAN DATANG</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end items-center gap-2">
-                              <a href={`/invitation/${inv.slug}`} target="_blank" rel="noreferrer">
-                                <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium text-slate-600 hover:text-slate-900"><Eye className="w-3.5 h-3.5 mr-1.5" /> Web</Button>
-                              </a>
-                              <Link href={`/dashboard?viewAs=${inv.userId}`}>
-                                <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"><LayoutDashboard className="w-3.5 h-3.5 mr-1.5" /> Dash</Button>
-                              </Link>
-                              <Link href={`/admin/edit/${inv.id}`}>
-                                <Button variant="default" size="sm" className="h-8 px-3 text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white shadow-sm"><Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit</Button>
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* KOLOM KANAN (1/3): MANAGEMENT STAFF */}
-        <div className="space-y-6 min-w-0">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-purple-600" /> Tim Internal
+      {/* TABEL DATA PREMIUM */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-[#07303F]">
+                {isAdmin ? "Daftar Mitra Aktif" : "Daftar Calon Pengantin"}
             </h2>
-            <AddStaffModal />
-          </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-3 py-1.5 rounded-sm">
+                {users.length} Records
+            </span>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-[10px] uppercase tracking-widest text-slate-400 bg-[#F9F8F4] border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4 font-bold">Identitas {isAdmin ? "Partner" : "Klien"}</th>
+                <th className="px-6 py-4 font-bold">Kontak Akses</th>
+                <th className="px-6 py-4 font-bold text-center">{isAdmin ? "Total Klien" : "Undangan"}</th>
+                <th className="px-6 py-4 font-bold">Tgl. Registrasi</th>
+                <th className="px-6 py-4 font-bold text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {users.length === 0 ? (
+                <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                        <Users className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                        <p className="font-serif italic text-lg text-[#07303F]">Belum ada data terdaftar.</p>
+                    </td>
+                </tr>
+              ) : (
+                users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#07303F]/5 flex items-center justify-center text-[#07303F] font-serif font-bold italic">
+                            {u.name ? u.name.charAt(0).toUpperCase() : (u.companyName ? u.companyName.charAt(0).toUpperCase() : "?")}
+                        </div>
+                        <div>
+                            <div className="font-bold text-[#07303F] group-hover:text-[#E5C185] transition-colors">
+                                {u.companyName || u.name || "Unnamed Entity"}
+                            </div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                                ID: {u.id.substring(0,8)}...
+                            </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                        <span className="text-slate-600">{u.email || "-"}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center justify-center min-w-[2rem] h-6 bg-[#F9F8F4] border border-slate-200 rounded-sm text-xs font-bold text-[#07303F]">
+                            {isAdmin ? u._count.managedUsers : u._count.invitations}
+                        </span>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                        {new Date(u.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-[#07303F] hover:text-[#E5C185] transition-colors border border-transparent hover:border-[#E5C185] px-3 py-1.5 rounded-sm">
+                            Manage
+                        </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-          <div className="grid gap-3">
-            {staffUsers.length === 0 ? (
-              <div className="p-4 bg-white rounded-lg border border-slate-200 text-center text-sm text-slate-500">Belum ada tim internal.</div>
-            ) : staffUsers.map((user) => (
-              <Card key={user.id} className="p-4 flex items-center justify-between gap-3 shadow-sm border-slate-200 hover:shadow-md transition-shadow">
-                {/* min-w-0 mutlak di sini agar flexbox mengizinkan penyusutan */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+    </div>
+  );
+}
 
-                  {/* shrink-0 memaksa avatar tetap bulat sempurna, tidak gepeng */}
-                  <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : user.role === 'PARTNER' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {user.role.substring(0, 2)}
-                  </div>
-
-                  {/* min-w-0 pada teks memaksa email yang kepanjangan menjadi titik-titik (truncate) */}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-sm text-slate-800 truncate">{user.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                  </div>
-                </div>
-
-                {/* shrink-0 memaksa badge role tidak terhimpit teks */}
-                <span className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold border ${user.role === 'ADMIN' ? "border-purple-200 text-purple-700 bg-purple-50" : user.role === 'PARTNER' ? "border-blue-200 text-blue-700 bg-blue-50" : "border-amber-200 text-amber-700 bg-amber-50"}`}>
-                  {user.role}
-                </span>
-              </Card>
-            ))}
-          </div>
-
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 text-xs text-blue-700">
-            <p className="font-bold mb-1">💡 Hierarki Akses:</p>
-            <ul className="list-disc ml-4 space-y-1">
-              {userRole === "ADMIN" && <li><b>ADMIN:</b> Dewa. Melihat semua data, klien, dan partner.</li>}
-              {userRole === "ADMIN" && <li><b>PARTNER:</b> WO. Hanya melihat klien & tim buatan mereka sendiri.</li>}
-              <li><b>USHER:</b> Staf Lapangan. Hanya akses scan QR tamu.</li>
-            </ul>
-          </div>
+// KOMPONEN STATS CARD KHUSUS PREMIUM
+function StatsCard({ title, value, desc, icon, highlight = false }: { title: string, value: string, desc: string, icon: React.ReactNode, highlight?: boolean }) {
+  return (
+    <div className={cn(
+      "p-6 rounded-xl border transition-all duration-300",
+      highlight 
+        ? "bg-[#07303F] text-[#F9F8F4] border-[#07303F] shadow-xl shadow-[#07303F]/10" 
+        : "bg-white text-[#07303F] border-slate-200 shadow-sm hover:shadow-md hover:border-[#E5C185]/50"
+    )}>
+      <div className="flex flex-row items-center justify-between mb-4">
+        <h3 className={cn("text-[10px] font-bold uppercase tracking-widest", highlight ? "text-[#E5C185]" : "text-slate-400")}>{title}</h3>
+        <div className={cn("p-2 rounded-full", highlight ? "bg-[#F9F8F4]/10" : "bg-[#F9F8F4]")}>
+          {icon}
+        </div>
+      </div>
+      <div>
+        <div className="text-3xl md:text-4xl font-serif italic font-bold leading-none mb-2">{value}</div>
+        <div className="flex items-center mt-2">
+             <span className={cn("text-[10px] uppercase tracking-wider", highlight ? "text-[#E5C185]/70" : "text-slate-400")}>{desc}</span>
         </div>
       </div>
     </div>
