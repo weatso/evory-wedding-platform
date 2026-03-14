@@ -1,6 +1,6 @@
 "use server";
 
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command , PutObjectCommand, DeleteObjectCommand, CopyObjectCommand} from "@aws-sdk/client-s3";
 import { r2Client } from "@/lib/r2";
 import { auth } from "@/auth";
 
@@ -80,5 +80,119 @@ export async function listR2Files(destination: "client" | "template", folderPref
   } catch (error: any) {
     console.error("R2 Explorer Error:", error);
     return { success: false, error: error.message || "Gagal mengambil data dari R2" };
+  }
+}
+
+export async function createR2Folder(destination: "client" | "template", currentPath: string, folderName: string) {
+  const session = await auth();
+  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
+
+  // Sanitasi nama folder: ubah spasi jadi strip, hapus karakter aneh
+  const safeFolderName = folderName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  if (!safeFolderName) return { success: false, error: "Nama folder tidak valid." };
+
+  // S3 Folder Trick: Buat file 0 byte yang diakhiri dengan '/'
+  const prefix = currentPath ? `${currentPath}/` : "";
+  const folderKey = `${prefix}${safeFolderName}/`;
+
+  try {
+    await r2Client.send(new PutObjectCommand({
+      Bucket: bucketName,
+      Key: folderKey,
+      Body: new Uint8Array(0), // 0 byte file
+    }));
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: "Gagal membuat direktori." };
+  }
+}
+
+export async function uploadR2File(destination: "client" | "template", currentPath: string, formData: FormData) {
+  const session = await auth();
+  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  const file = formData.get("file") as File;
+  
+  if (!bucketName || !file) return { success: false, error: "File atau Bucket tidak ditemukan." };
+
+  // Sanitasi nama file agar URL friendly
+  const safeFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '-');
+  const prefix = currentPath ? `${currentPath}/` : "";
+  const fileKey = `${prefix}${safeFileName}`;
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    
+    await r2Client.send(new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileKey,
+      Body: buffer,
+      ContentType: file.type,
+    }));
+    
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: "Gagal mengunggah aset." };
+  }
+}
+
+export async function deleteR2Object(destination: "client" | "template", key: string) {
+  const session = await auth();
+  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
+
+  try {
+    await r2Client.send(new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    }));
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: "Gagal menghapus aset dari Vault." };
+  }
+}
+
+export async function renameR2File(destination: "client" | "template", oldKey: string, newFileName: string) {
+  const session = await auth();
+  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
+
+  // Ekstrak path direktori dari oldKey
+  const pathParts = oldKey.split('/');
+  pathParts.pop(); // Buang nama file lama
+  const prefix = pathParts.length > 0 ? pathParts.join('/') + '/' : '';
+  
+  // Sanitasi nama baru
+  const safeNewName = newFileName.replace(/[^a-zA-Z0-9.\-_]/g, '-');
+  const newKey = `${prefix}${safeNewName}`;
+
+  if (oldKey === newKey) return { success: true }; // Tidak ada perubahan
+
+  try {
+    // 1. DUPLIKASI KE NAMA BARU
+    await r2Client.send(new CopyObjectCommand({
+      Bucket: bucketName,
+      CopySource: `${bucketName}/${oldKey}`, // Format wajib: bucket/key
+      Key: newKey,
+    }));
+
+    // 2. HAPUS FILE LAMA
+    await r2Client.send(new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: oldKey,
+    }));
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Rename Error:", error);
+    return { success: false, error: "Gagal memanipulasi identitas objek R2." };
   }
 }

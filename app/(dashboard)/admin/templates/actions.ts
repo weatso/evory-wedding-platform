@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { PackageTier } from "@prisma/client"; // WAJIB DIIMPORT UNTUK ENUM
+import { PackageTier } from "@prisma/client";
+import { PutObjectCommand } from "@aws-sdk/client-s3"; // IMPORT S3 COMMAND
+import { r2Client } from "@/lib/r2"; // IMPORT R2 CLIENT
 
 // ==========================================
 // SCHEMAS (VALIDASI DATA)
@@ -17,7 +19,6 @@ const TemplateSchema = z.object({
   thumbnail: z.string().min(1, "Thumbnail wajib diupload"),
   previewUrl: z.string().optional(),
   description: z.string().optional(),
-  // TAMBAHAN BARU UNTUK MENANGKAP DATA DARI UI
   tier: z.string().optional(), 
   isFeatured: z.string().optional(),
 });
@@ -32,13 +33,12 @@ const CategorySchema = z.object({
 // ==========================================
 
 export async function createTemplate(formData: FormData) {
-  // 1. Cek Security (Hanya Admin)
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { error: "Unauthorized Access" };
   }
 
-  // 2. Ambil Data dari Form (Termasuk data baru)
+  // Tangkap data mentah dari form
   const rawData = {
     name: formData.get("name"),
     slug: formData.get("slug"),
@@ -50,17 +50,18 @@ export async function createTemplate(formData: FormData) {
     isFeatured: formData.get("isFeatured"),
   };
 
-  // 3. Validasi
+  // Validasi ketat dengan Zod
   const validated = TemplateSchema.safeParse(rawData);
   if (!validated.success) {
     console.error("Validation Error:", validated.error);
     return { error: "Data tidak valid. Cek kembali inputan Anda." };
   }
 
+  // Ekstrak data yang sudah bersih dan aman
   const { name, slug, categoryId, thumbnail, previewUrl, description, tier, isFeatured } = validated.data;
 
   try {
-    // Pengecekan Duplikasi Slug sebelum Prisma Crash
+    // Pengecekan Duplikasi Slug
     const existingTemplate = await prisma.template.findUnique({
       where: { slug },
     });
@@ -69,7 +70,7 @@ export async function createTemplate(formData: FormData) {
       return { error: `Slug "${slug}" sudah digunakan. Gunakan nama/slug lain.` };
     }
 
-    // 4. Konversi Data & Simpan ke Database
+    // 1. SIMPAN KE DATABASE (PostgreSQL)
     await prisma.template.create({
       data: {
         name,
@@ -77,20 +78,36 @@ export async function createTemplate(formData: FormData) {
         categoryId,
         thumbnail,
         description: description || "", 
-        previewUrl: previewUrl || `/preview/${slug}`, // Saya ubah agar mengarah ke route preview Anda
+        previewUrl: previewUrl || `/preview/${slug}`, // Menggunakan variabel Zod bersih
         previewText: name.substring(0, 3).toUpperCase(), 
         bgColor: "bg-stone-900",
         isActive: true,
-        // LOGIKA BARU DI SINI
         tier: (tier as PackageTier) || PackageTier.ESSENTIAL,
-        isFeatured: isFeatured === "true", // Konversi string dari FormData menjadi boolean
+        isFeatured: isFeatured === "true",
       },
     });
 
-    // 5. Refresh Halaman secara Komprehensif
+    // 2. OTOMATISASI FOLDER R2 (Cloudflare)
+    const bucketName = process.env.R2_TEMPLATE_BUCKET;
+    if (bucketName) {
+      try {
+        const folderKey = `templates/${slug}/`;
+        await r2Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: folderKey,
+          Body: new Uint8Array(0), // File kosong sebagai penanda folder
+        }));
+      } catch (r2Error) {
+        console.error("Gagal membuat auto-folder di R2:", r2Error);
+        // Jika R2 gagal (misal karena koneksi), kita tidak membatalkan Prisma,
+        // karena folder masih bisa dibuat manual di Asset Vault.
+      }
+    }
+
+    // 3. REFRESH CACHE UI
     revalidatePath("/admin/templates");
-    revalidatePath("/collection"); // Update Gudang
-    revalidatePath("/"); // Update Etalase Landing Page
+    revalidatePath("/collection");
+    revalidatePath("/");
     
     return { success: true };
 
@@ -132,8 +149,6 @@ export async function createCategory(formData: FormData) {
   if (!validated.success) return { error: "Nama kategori wajib diisi." };
 
   const { name, description } = validated.data;
-  
-  // Format slug lebih bersih tanpa random string panjang di belakang jika memungkinkan
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
   try {
