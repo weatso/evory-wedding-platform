@@ -21,12 +21,15 @@ export default async function GuestsPage(props: Props) {
   const userRole = session.user.role;
   const targetUserId = (userRole === "ADMIN" && viewAsId) ? viewAsId : session.user.id; 
 
-  const invitation = await prisma.invitation.findFirst({
-    where: { userId: targetUserId },
-    include: { guests: { orderBy: { createdAt: 'desc' } } },
-  });
-
-  if (!invitation) return <div>Data tidak ditemukan. Silakan buat undangan terlebih dahulu.</div>;
+  const project = await prisma.project.findFirst({
+      where: { userId: targetUserId, isActive: true },
+      include: { guests: { orderBy: { createdAt: 'desc' } } },
+    });
+    
+    // Ganti juga pengecekan error di bawahnya:
+    if (!project) {
+        return <div>Belum ada proyek aktif.</div>;
+    }
 
   return (
     <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -35,7 +38,7 @@ export default async function GuestsPage(props: Props) {
             <h2 className="text-xl font-bold text-slate-800">Tambah Tamu</h2>
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-1 rounded-xl shadow-xl">
                 <div className="bg-slate-50 text-slate-900 rounded-lg">
-                        <GuestForm invitationId={invitation.id} />
+                        <GuestForm projectId={project.id} />
                 </div>
             </div>
             <div className="p-4 bg-blue-50 text-blue-800 rounded-lg text-xs border border-blue-100">
@@ -49,11 +52,11 @@ export default async function GuestsPage(props: Props) {
             <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800">Daftar Tamu</h2>
-                    <p className="text-xs text-slate-500 mt-1">Total: <Badge variant="secondary" className="ml-1">{invitation.guests.length} Data</Badge></p>
+                    <p className="text-xs text-slate-500 mt-1">Total: <Badge variant="secondary" className="ml-1">{project.guests.length} Data</Badge></p>
                 </div>
                 
                 {/* ---> TOMBOL MESIN EXPORT DITANAM DI SINI <--- */}
-                <ExportGuestsButton guests={invitation.guests} slug={invitation.slug} />
+                <ExportGuestsButton guests={project.guests} slug={project.slug} />
             </div>
 
             <Card className="border-slate-200 shadow-md overflow-hidden">
@@ -70,14 +73,14 @@ export default async function GuestsPage(props: Props) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
-                                {invitation.guests.length === 0 ? (
+                                {project.guests.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="p-12 text-center text-slate-400 flex flex-col items-center justify-center">
                                             <Users className="w-10 h-10 mb-3 opacity-20" />
                                             <p>Belum ada tamu.</p>
                                         </td>
                                     </tr>
-                                ) : invitation.guests.map((g) => (
+                                ) : project.guests.map((g) => (
                                     <tr key={g.id} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-slate-800">{g.name}</div>
@@ -100,7 +103,7 @@ export default async function GuestsPage(props: Props) {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {/* PERBAIKAN: Kirim SLUG ke sini */}
-                                            <GuestRowActions guest={g} invitationSlug={invitation.slug} />
+                                            <GuestRowActions guest={g} projectSlug={project.slug} />
                                         </td>
                                     </tr>
                                 ))}

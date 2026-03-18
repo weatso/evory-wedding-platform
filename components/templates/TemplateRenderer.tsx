@@ -1,20 +1,20 @@
 "use client";
 
-import { Invitation, Template, Guest } from "@prisma/client";
-import { getTemplate } from "./registry";
+import { Project, Template, Guest } from "@prisma/client";
+import { getTemplate, ExtendedWish } from "./registry"; // PERBAIKAN: Import tipe yang benar dari registry
 
-// Sesuaikan tipe data dengan yang ada di Page.tsx
-type InvitationWithTemplate = Invitation & {
+// PERBAIKAN: Hapus tanda tanya (?) pada wishes dan gunakan tipe yang spesifik
+type InvitationWithTemplate = Project & {
   template: Template | null;
-  wishes?: any[];
+  wishes: ExtendedWish[]; 
 };
 
 export default function TemplateRenderer({ 
   invitation, 
-  guest // <--- TERIMA GUEST DI SINI
+  guest 
 }: { 
   invitation: InvitationWithTemplate; 
-  guest?: Guest | null; // <--- DEFINISIKAN TIPENYA
+  guest?: Guest | null; 
 }) {
   // 1. Ambil slug
   const templateSlug = invitation.template?.slug;

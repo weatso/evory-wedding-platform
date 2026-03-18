@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Copy, MoreHorizontal, Pencil, Trash2, Send } from "lucide-react"; // Tambah Icon Send
+import { Copy, MoreHorizontal, Pencil, Trash2, Send } from "lucide-react";
 import { useState } from "react";
 import {
     Dialog,
@@ -34,8 +34,8 @@ export interface GuestData {
     whatsapp: string | null;
 }
 
-// PERBAIKAN: Terima invitationSlug
-export default function GuestRowActions({ guest, invitationSlug }: { guest: GuestData, invitationSlug: string }) {
+// PERBAIKAN: Komentar dipindahkan, deklarasi bersih.
+export default function GuestRowActions({ guest, projectSlug }: { guest: any; projectSlug: string; }) {
     const [openEdit, setOpenEdit] = useState(false);
     const [openDelete, setOpenDelete] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -86,11 +86,10 @@ export default function GuestRowActions({ guest, invitationSlug }: { guest: Gues
         }
     };
 
-    // --- LOGIC BARU: GENERATE LINK YANG BENAR ---
+    // --- LOGIC BARU: GENERATE LINK MENGGUNAKAN PROJECT SLUG ---
     const getInvitationLink = () => {
         const baseUrl = window.location.origin;
-        // Format: domain.com/invitation/slug?u=KODE
-        return `${baseUrl}/invitation/${invitationSlug}?to=${guest.guestCode}`;
+        return `${baseUrl}/invitation/${projectSlug}?to=${guest.guestCode}`;
     };
 
     const copyInvitationLink = () => {
@@ -105,7 +104,6 @@ export default function GuestRowActions({ guest, invitationSlug }: { guest: Gues
             return;
         }
 
-        // Format Nomor (0812... -> 62812...)
         let phone = guest.whatsapp.trim();
         if (phone.startsWith("0")) {
             phone = "62" + phone.slice(1);
@@ -130,12 +128,10 @@ export default function GuestRowActions({ guest, invitationSlug }: { guest: Gues
                 <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuLabel>Aksi Tamu</DropdownMenuLabel>
                     
-                    {/* TOMBOL COPY LINK */}
                     <DropdownMenuItem onClick={copyInvitationLink} className="cursor-pointer font-medium">
                         <Copy className="mr-2 h-4 w-4 text-blue-600" /> Salin Link
                     </DropdownMenuItem>
 
-                    {/* TOMBOL KIRIM WA (BARU) */}
                     <DropdownMenuItem onClick={sendWhatsapp} className="cursor-pointer font-medium">
                         <Send className="mr-2 h-4 w-4 text-green-600" /> Kirim WhatsApp
                     </DropdownMenuItem>
@@ -152,7 +148,7 @@ export default function GuestRowActions({ guest, invitationSlug }: { guest: Gues
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* --- MODAL EDIT (SAMA SEPERTI SEBELUMNYA) --- */}
+            {/* --- MODAL EDIT --- */}
             <Dialog open={openEdit} onOpenChange={setOpenEdit}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
@@ -184,7 +180,7 @@ export default function GuestRowActions({ guest, invitationSlug }: { guest: Gues
                 </DialogContent>
             </Dialog>
 
-            {/* --- MODAL DELETE (SAMA SEPERTI SEBELUMNYA) --- */}
+            {/* --- MODAL DELETE --- */}
             <Dialog open={openDelete} onOpenChange={setOpenDelete}>
                 <DialogContent>
                     <DialogHeader>

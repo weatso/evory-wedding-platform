@@ -6,19 +6,14 @@ import { z } from "zod";
 
 // --- SKEMA PERTAHANAN ZOD (Karantina Data) ---
 const RsvpSchema = z.object({
-  invitationId: z.string().min(1, "ID Undangan tidak valid."),
+  projectId: z.string().min(1, "ID Proyek tidak valid."), // PERBAIKAN: invitationId -> projectId
   guestId: z.string().nullable(),
-  // Transformasi: potong spasi awal/akhir, batasi maksimal 100 karakter
   name: z.string().max(100, "Nama maksimal 100 karakter.").transform((val) => val.trim()),
-  // PERBAIKAN 1: Gunakan sintaks standar pesan error Zod
-  // PERBAIKAN FINAL: Gunakan 'message' sesuai permintaan strict type Zod Anda
   status: z.enum(["ATTENDING", "DECLINED"], {
     message: "Status kehadiran wajib dipilih dan tidak boleh dimanipulasi."
   }),
-  // Transformasi: batasi pesan maksimal 500 karakter untuk mencegah spam database
   message: z.string().max(500, "Ucapan maksimal 500 karakter.").transform((val) => val.trim()),
 }).superRefine((data, ctx) => {
-  // Aturan Mutlak: Jika tamu publik (guestId null), nama setelah di-trim tidak boleh kosong
   if (!data.guestId && data.name.length === 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -28,29 +23,25 @@ const RsvpSchema = z.object({
   }
 });
 
-// Helper sederhana untuk bikin kode unik acak (Format: PUB-XXXXXX)
 function generateGuestCode() {
   return `PUB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 }
 
 // --- FUNGSI SUBMIT RSVP ---
 export async function submitRsvp(
-  invitationId: string,
+  projectId: string, // PERBAIKAN: invitationId -> projectId
   guestId: string | null,
   name: string,
   status: "ATTENDING" | "DECLINED", 
   message: string
 ) {
   try {
-    // 1. Eksekusi Validasi Brutal
-    const validatedData = RsvpSchema.safeParse({ invitationId, guestId, name, status, message });
+    const validatedData = RsvpSchema.safeParse({ projectId, guestId, name, status, message });
     
     if (!validatedData.success) {
-      // PERBAIKAN 2: Gunakan 'issues' alih-alih 'errors' agar TypeScript patuh
       throw new Error(validatedData.error.issues[0].message);
     }
 
-    // Ambil data yang sudah dibersihkan (di-trim dan diverifikasi)
     const cleanData = validatedData.data;
     let finalGuestId = cleanData.guestId;
 
@@ -65,8 +56,8 @@ export async function submitRsvp(
 
         if (!existingGuest) throw new Error("Data tamu tidak ditemukan.");
 
-        // PERTAHANAN IDOR MUTLAK: Pastikan tamu yang diedit BENAR-BENAR milik undangan ini!
-        if (existingGuest.invitationId !== cleanData.invitationId) {
+        // PERTAHANAN IDOR MUTLAK
+        if (existingGuest.projectId !== cleanData.projectId) { // PERBAIKAN: invitationId -> projectId
           throw new Error("Security Breach: ID Tamu tidak memiliki otoritas pada acara ini.");
         }
 
@@ -76,7 +67,6 @@ export async function submitRsvp(
             rsvpStatus: cleanData.status,
             pax: cleanData.status === "ATTENDING" ? existingGuest.totalPaxAllocated : 0,
             isCheckedIn: cleanData.status === "ATTENDING" ? undefined : false,
-            // Jika tamu memasukkan nama baru, simpan. Jika kosong, biarkan nama asli.
             name: cleanData.name && cleanData.name !== existingGuest.name ? cleanData.name : undefined, 
           }
         });
@@ -87,7 +77,7 @@ export async function submitRsvp(
       else {
         const newGuest = await tx.guest.create({
           data: {
-            invitationId: cleanData.invitationId,
+            projectId: cleanData.projectId, // PERBAIKAN: invitationId -> projectId
             name: cleanData.name,
             guestCode: generateGuestCode(), 
             category: "Public", 
@@ -105,7 +95,7 @@ export async function submitRsvp(
           data: {
             message: cleanData.message,
             guestId: finalGuestId,
-            invitationId: cleanData.invitationId,
+            projectId: cleanData.projectId, // PERBAIKAN: invitationId -> projectId
           }
         });
       }

@@ -7,7 +7,7 @@ import { Loader2, Save, UserPlus } from "lucide-react";
 import { useRef, useState } from "react";
 import { addGuest } from "./actions"; // Import Server Action
 
-export default function GuestForm({ invitationId }: { invitationId: string }) {
+export default function GuestForm({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -16,7 +16,7 @@ export default function GuestForm({ invitationId }: { invitationId: string }) {
 
     // --- PERBAIKAN DI SINI ---
     // Sekarang kita kirim invitationId sebagai parameter pertama
-    const result = await addGuest(invitationId, formData);
+    const result = await addGuest(projectId, formData);
 
     setLoading(false);
 

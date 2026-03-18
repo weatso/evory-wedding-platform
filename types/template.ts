@@ -1,5 +1,5 @@
 // types/template.ts
-import { Guest, Invitation, Wish } from "@prisma/client";
+import { Guest, Project, Wish } from "@prisma/client";
 
 export interface LoveStory {
   year: string;
@@ -14,7 +14,7 @@ export type WishWithGuest = Wish & {
 };
 
 // Definisikan Invitation yang membawa daftar Wish tadi
-export type InvitationWithRelations = Invitation & {
+export type InvitationWithRelations = Project & {
   wishes: WishWithGuest[];
 };
 

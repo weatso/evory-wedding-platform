@@ -1,139 +1,76 @@
-// File: app/(dashboard)/usher/scan/actions.ts
-'use server';
+"use server";
 
-import { auth } from "@/auth"; 
-import { prisma } from "@/lib/prisma"; 
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function getEventDetail(invitationId: string) {
-    return await prisma.invitation.findUnique({
-        where: { id: invitationId },
-        select: { groomNick: true, brideNick: true }
+// 1. Ambil Detail Acara untuk Header Scanner
+export async function getEventDetail(projectId: string) {
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { eventMetadata: true } // Ambil brankas JSON-nya
     });
+
+    if (!project) return null;
+
+    // Ekstrak nama mempelai dari JSON
+    const meta = (project.eventMetadata as any) || {};
+    return {
+        groomNick: meta.groomNick || "Groom",
+        brideNick: meta.brideNick || "Bride"
+    };
 }
 
-// Helper Internal: Ambil Afiliasi Partner dari User Saat Ini
-async function getEffectivePartnerId(userId: string, userRole: string) {
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, partnerId: true }
-    });
-    // Jika dia PARTNER, maka ID dia sendiri adalah patokannya. 
-    // Jika dia USHER, maka partnerId atasan dia yang jadi patokan.
-    return userRole === "PARTNER" ? user?.id : user?.partnerId;
-}
-
-// 1. CARI TAMU (Dengan Karantina Kepemilikan)
-export async function getGuestByCode(code: string, eventId: string) {
+// 2. Validasi & Check-In Tamu
+export async function processQrScan(projectId: string, guestCode: string, actualPax?: number) {
     const session = await auth();
-    if (!session?.user) return { error: "Sesi habis." };
-
-    const userRole = session.user.role as string;
-    const userId = session.user.id as string;
-    const effectivePartnerId = await getEffectivePartnerId(userId, userRole);
-
-    // Tarik data tamu sekaligus intip siapa pemilik acara ini
-    const guest = await prisma.guest.findUnique({
-        where: { guestCode: code },
-        include: { 
-            invitation: { 
-                select: { 
-                    id: true,
-                    user: { select: { partnerId: true } } // Rantai B2B
-                } 
-            } 
-        }
-    });
-
-    if (!guest) return { error: "Kode Tamu tidak ditemukan." };
-    if (guest.invitationId !== eventId) return { error: "⛔ SALAH ACARA!" };
-
-    // PERTAHANAN MUTLAK IDOR: Pastikan WO/Partner-nya cocok
-    if (userRole === "USHER" || userRole === "PARTNER") {
-        const invitationOwner = guest.invitation.user;
-        if (!invitationOwner || invitationOwner.partnerId !== effectivePartnerId) {
-            return { error: "Security Breach: Tamu ini bukan dari klien di bawah naungan WO Anda." };
-        }
-    }
-
-    return { guest };
-}
-
-// 2. PROSES CHECK-IN (Dengan Karantina Kepemilikan)
-export async function processCheckIn(
-    guestId: string, 
-    inputPax: number, 
-    mode: 'FIRST' | 'ADD',
-    pin?: string
-) {
-    const session = await auth();
-    if (!session?.user || (session.user.role !== "USHER" && session.user.role !== "ADMIN" && session.user.role !== "PARTNER")) {
-        return { error: "Akses Ditolak." };
-    }
-
-    const userRole = session.user.role as string;
-    const userId = session.user.id as string;
-    const effectivePartnerId = await getEffectivePartnerId(userId, userRole);
-
-    const guest = await prisma.guest.findUnique({
-        where: { id: guestId },
-        include: { 
-            invitation: {
-                include: { user: { select: { partnerId: true } } }
-            } 
-        }
-    });
-
-    if (!guest) return { error: "Data tamu hilang." };
-
-    // PERTAHANAN MUTLAK IDOR SEBELUM TRANSAKSI WRITE
-    if (userRole === "USHER" || userRole === "PARTNER") {
-        const invitationOwner = guest.invitation.user;
-        if (!invitationOwner || invitationOwner.partnerId !== effectivePartnerId) {
-            return { error: "Pelanggaran Otoritas: Anda mencoba mengubah data entitas lain." };
-        }
-    }
-
-    // --- HITUNG LOGIKA PAX ---
-    let newPaxTotal = inputPax;
-    if (mode === 'ADD') {
-        newPaxTotal = guest.pax + inputPax;
-    }
-
-    // --- LOGIKA VALIDASI PIN ---
-    const isOverQuota = newPaxTotal > guest.totalPaxAllocated;
-    const isUpdateData = mode === 'ADD'; 
-
-    if (isOverQuota || isUpdateData) {
-        if (!pin) {
-            return { error: "PIN diperlukan untuk aksi ini.", requirePin: true };
-        }
-        if (pin !== guest.invitation.checkInPin) {
-            return { error: "PIN SALAH! Akses ditolak.", requirePin: true };
-        }
+    if (!session || (session.user.role !== "USHER" && session.user.role !== "ADMIN")) {
+        return { success: false, error: "Unauthorized: Akses ditolak." };
     }
 
     try {
-        const updated = await prisma.guest.update({
-            where: { id: guestId },
-            data: {
-                isCheckedIn: true, 
-                checkInTime: new Date(), 
-                pax: newPaxTotal,
-                checkedInById: userId,
-                lastUpdatedById: userId 
+        // Cari tamu berdasarkan kode QR dan pastikan dia milik Proyek ini
+        const guest = await prisma.guest.findFirst({
+            where: { 
+                projectId: projectId, 
+                guestCode: guestCode 
             }
         });
 
+        if (!guest) {
+            return { success: false, error: "QR Code tidak valid atau tamu tidak terdaftar di acara ini." };
+        }
+
+        if (guest.isCheckedIn) {
+            return { 
+                success: false, 
+                error: "Tamu sudah melakukan Check-In sebelumnya.",
+                guestName: guest.name 
+            };
+        }
+
+        // Eksekusi Check-in
+        const updatedGuest = await prisma.guest.update({
+            where: { id: guest.id },
+            data: {
+                isCheckedIn: true,
+                checkInTime: new Date(),
+                pax: actualPax || guest.totalPaxAllocated, // Gunakan pax aktual jika diisi usher
+                rsvpStatus: "ATTENDING" // Otomatis tandai hadir
+            }
+        });
+
+        // Trigger update ke layar Live Monitor secara realtime
         revalidatePath("/dashboard/live");
+
         return { 
             success: true, 
-            guestName: updated.name, 
-            totalPax: updated.pax,
-            msg: mode === 'ADD' ? `Berhasil tambah +${inputPax} pax` : `Check-in Sukses (${inputPax} pax)`
+            guestName: updatedGuest.name,
+            pax: updatedGuest.pax
         };
-    } catch (e) {
-        console.error("Check-in Error:", e); 
-        return { error: "Database Error" };
+
+    } catch (error) {
+        console.error("Scan Error:", error);
+        return { success: false, error: "Terjadi kesalahan sistem saat memproses QR." };
     }
 }

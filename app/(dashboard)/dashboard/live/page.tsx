@@ -7,20 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Users, UserCheck, Percent, Clock, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import AutoRefresh from "./AutoRefresh"; // Komponen Client kecil untuk refresh otomatis
+import AutoRefresh from "./AutoRefresh"; 
 
 export default async function LiveDashboard({ searchParams }: { searchParams: { id?: string } }) {
     const session = await auth();
     if (!session) redirect("/login");
 
-    // 1. Tentukan Event Mana yang Mau Dipantau
     let eventId = searchParams.id;
 
-    // Jika tidak ada ID di URL, cari event aktif milik user ini
     if (!eventId) {
-        const activeEvent = await prisma.invitation.findFirst({
+        const activeEvent = await prisma.project.findFirst({
             where: {
-                userId: session.user.id, // Sesuaikan logika jika USER ROLE = ADMIN bisa lihat semua
+                userId: session.user.id,
                 isActive: true
             },
             select: { id: true }
@@ -28,7 +26,6 @@ export default async function LiveDashboard({ searchParams }: { searchParams: { 
         if (activeEvent) eventId = activeEvent.id;
     }
 
-    // Jika masih tidak ketemu (User tidak punya event aktif)
     if (!eventId) {
         return (
             <div className="p-8 text-center">
@@ -38,50 +35,50 @@ export default async function LiveDashboard({ searchParams }: { searchParams: { 
         );
     }
 
-    // 2. Ambil Data Detail Event & Statistik
-    const event = await prisma.invitation.findUnique({
+    const event = await prisma.project.findUnique({
         where: { id: eventId },
         include: {
             guests: {
                 where: { isCheckedIn: true },
                 orderBy: { checkInTime: 'desc' },
-                take: 10 // Ambil 10 tamu terakhir yang masuk
+                take: 10 
             }
         }
     });
-
+    
     if (!event) return <div>Acara tidak ditemukan.</div>;
 
-    // 3. Hitung Statistik via Prisma Aggregate (Lebih Cepat daripada loop manual)
+    // --- EKSTRAKSI METADATA (JSON) ---
+    const meta = (event.eventMetadata as any) || {};
+    const groomNick = meta.groomNick || "Groom";
+    const brideNick = meta.brideNick || "Bride";
+    const location = meta.location || "Lokasi Belum Diatur";
+
     const stats = await prisma.guest.aggregate({
-        where: { invitationId: eventId },
+        where: { projectId: eventId },
         _sum: {
-            totalPaxAllocated: true, // Total Undangan (Kapasitas)
-            pax: true,               // Total Orang Hadir (Actual)
+            totalPaxAllocated: true, 
+            pax: true,              
         },
         _count: {
-            id: true,                // Total Baris Tamu
-            checkInTime: true        // Total Transaksi Check-in (yang tidak null)
+            id: true,                
+            checkInTime: true        
         }
     });
 
     const totalInvitedPax = stats._sum.totalPaxAllocated || 0;
     const totalActualPax = stats._sum.pax || 0;
-    // LOGIKA BARU: Sisa Kuota
     const remainingQuota = totalInvitedPax - totalActualPax;
     const isOverCapacity = remainingQuota < 0;
     const totalGuests = stats._count.id || 0;
     const checkedInCount = stats._count.checkInTime || 0;
 
-    // Persentase Kehadiran (Berdasarkan Pax)
     const occupancyRate = totalInvitedPax > 0
         ? Math.round((totalActualPax / totalInvitedPax) * 100)
         : 0;
 
     return (
         <div className="min-h-screen bg-slate-50 p-6 font-sans">
-
-            {/* HEADER NAVIGASI */}
             <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-4">
                     <Link href="/dashboard">
@@ -89,17 +86,17 @@ export default async function LiveDashboard({ searchParams }: { searchParams: { 
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">Live Monitor</h1>
-                        <p className="text-sm text-slate-500">{event.groomNick} & {event.brideNick} • {event.location}</p>
+                        {/* MENGGUNAKAN VARIABEL YANG SUDAH DIEKSTRAK */}
+                        <p className="text-sm text-slate-500">{groomNick} & {brideNick} • {location}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
                     <span className="text-xs font-bold text-green-700 uppercase">Live Update</span>
-                    <AutoRefresh />
+                    <AutoRefresh intervalMs={10000} />
                 </div>
             </div>
 
-            {/* STATS CARDS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <StatCard
                     title="Total Hadir (Pax)"
@@ -115,7 +112,6 @@ export default async function LiveDashboard({ searchParams }: { searchParams: { 
                 />
                 <StatCard
                     title="Occupancy"
-                    // Jika > 100%, beri warna Merah
                     value={
                         <span className={occupancyRate > 100 ? "text-red-600" : "text-slate-900"}>
                             {occupancyRate}%
@@ -129,15 +125,14 @@ export default async function LiveDashboard({ searchParams }: { searchParams: { 
                     title={isOverCapacity ? "Over Capacity" : "Sisa Kuota"}
                     value={
                         isOverCapacity
-                            ? <span className="text-red-600">+{Math.abs(remainingQuota)}</span> // Tampilkan "+1" merah
-                            : remainingQuota.toString() // Tampilkan angka biasa
+                            ? <span className="text-red-600">+{Math.abs(remainingQuota)}</span> 
+                            : remainingQuota.toString() 
                     }
                     sub={isOverCapacity ? "Melebihi total kursi tersedia" : "Kursi kosong tersedia"}
                     icon={<Clock className={`w-5 h-5 ${isOverCapacity ? "text-red-600" : "text-slate-600"}`} />}
                 />
             </div>
 
-            {/* RECENT ACTIVITY TABLE */}
             <Card className="shadow-sm border-slate-200">
                 <CardHeader className="bg-white border-b border-slate-100">
                     <CardTitle className="text-lg flex items-center gap-2">

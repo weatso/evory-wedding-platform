@@ -1,22 +1,23 @@
 import dynamic from "next/dynamic";
 import { ComponentType } from "react";
-import { Guest, Invitation, Template, Wish } from "@prisma/client";
+import { Guest, Project, Template, Wish } from "@prisma/client";
 
 // --- 1. DEFINISI TIPE PROPS YANG BENAR ---
-// Pastikan relasi wishes membawa data guest untuk keperluan render nama
-export type WishWithGuest = Wish & {
-  guest: Guest | null;
+export type ExtendedWish = Wish & { 
+    guest: Guest | null; 
 };
 
-export type InvitationWithTemplate = Invitation & {
-  template: Template | null;
-  wishes?: WishWithGuest[]; // Array relasional dari DB
-};
+// PERBAIKAN: Gunakan nama WeddingTemplateProps agar sinkron dengan baris bawah file Anda
+export interface WeddingTemplateProps {
+    invitation: Project & {
+        template: Template | null;
+        wishes: ExtendedWish[];
+    };
+    guest?: Guest | null;
+}
 
-export type WeddingTemplateProps = {
-  invitation: InvitationWithTemplate;
-  guest?: Guest | null;
-};
+// --- 2. REGISTRI KOMPONEN TEMPLATE ---
+// (BIARKAN DAFTAR REGISTRY ANDA DI BAWAH INI TETAP UTUH)
 
 // --- 2. STATIC DICTIONARY REGISTRY ---
 // WAJIB statis (string literal) agar Next.js bisa melakukan Code Splitting.

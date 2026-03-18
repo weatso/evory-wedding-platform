@@ -8,17 +8,17 @@ export default async function InvitationPage({
   params,
   searchParams
 }: { 
-  params: { slug: string };
-  searchParams: { to?: string };
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ to?: string }>;
 }) {
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
 
   const { slug } = resolvedParams;
-  const guestId = resolvedSearchParams.to; 
+  const guestCode = resolvedSearchParams.to; // PERBAIKAN: Menggunakan variabel yang tepat
 
-  // 1. Tarik Data Undangan (Publik bisa melihat)
-  const invitationData = await prisma.invitation.findUnique({
+  // 1. Tarik Data Proyek (Dahulu Undangan)
+  const projectData = await prisma.project.findUnique({
     where: { slug, isActive: true },
     include: {
       template: true,
@@ -29,26 +29,28 @@ export default async function InvitationPage({
     }
   });
 
-  if (!invitationData || !invitationData.template) {
+  if (!projectData || !projectData.template) {
     return notFound();
   }
 
-  // 2. Validasi Tamu Spesifik (Hanya yang punya KTP Valid yang dikenali)
+  // 2. Validasi Tamu Spesifik (Mencocokkan Kode Tamu, bukan ID)
   let guestData = null;
-  if (guestId) {
+  if (guestCode) {
     guestData = await prisma.guest.findFirst({
       where: { 
-        id: guestId,
-        invitationId: invitationData.id 
+        guestCode: guestCode, // PERBAIKAN BUG BISU: Cocokkan dengan guestCode dari URL
+        projectId: projectData.id  // PERBAIKAN ARSITEKTUR: invitationId menjadi projectId
       }
     });
   }
 
-  // 3. Render Template (Jika guestData null, template masuk mode Read-Only)
+  // 3. Render Template
   return (
     <main className="min-h-screen bg-black w-full overflow-x-hidden">
       <TemplateRenderer 
-        invitation={invitationData as any} 
+        // Tetap menggunakan properti 'invitation' agar tidak memutus struktur komponen TemplateRenderer Anda, 
+        // namun mesin di dalamnya murni menggunakan 'projectData'.
+        invitation={projectData as any} 
         guest={guestData} 
       />
     </main>
