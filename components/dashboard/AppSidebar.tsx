@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { signOut } from "next-auth/react"; 
 import Image from "next/image";
+import { ServiceModule } from "@prisma/client";
 
 export default function AppSidebar({ userRole }: { userRole: string }) {
   const pathname = usePathname();
