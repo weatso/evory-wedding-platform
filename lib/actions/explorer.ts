@@ -3,8 +3,26 @@
 import { ListObjectsV2Command , PutObjectCommand, DeleteObjectCommand, CopyObjectCommand} from "@aws-sdk/client-s3";
 import { r2Client } from "@/lib/r2";
 import { auth } from "@/auth";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// Fungsi utilitas internal untuk mengubah Bytes ke format manusia (KB/MB)
+// TIPE DESTINASI BARU (Sudah mencakup WCC)
+type R2Destination = "client" | "template" | "wcc";
+
+// HELPER FUNCTION: Mencegah perulangan kode if-else yang kotor
+function getBucketConfig(destination: R2Destination) {
+  switch (destination) {
+    case "client":
+      return { bucketName: process.env.R2_CLIENT_BUCKET, publicUrlBase: process.env.R2_CLIENT_PUBLIC_URL };
+    case "template":
+      return { bucketName: process.env.R2_TEMPLATE_BUCKET, publicUrlBase: process.env.R2_TEMPLATE_PUBLIC_URL };
+    case "wcc":
+      return { bucketName: process.env.R2_WCC_BUCKET, publicUrlBase: process.env.R2_WCC_PUBLIC_URL };
+    default:
+      return { bucketName: undefined, publicUrlBase: undefined };
+  }
+}
+
+// FORMATTER UKURAN FILE
 function formatBytes(bytes: number, decimals = 1) {
   if (!+bytes) return '0 Bytes';
   const k = 1024;
@@ -14,50 +32,33 @@ function formatBytes(bytes: number, decimals = 1) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-export async function listR2Files(destination: "client" | "template", folderPrefix: string = "") {
+// 1. LIST FILES (BACA DIREKTORI)
+export async function listR2Files(destination: R2Destination, folderPrefix: string = "") {
   const session = await auth();
-  if (!session || !session.user || session.user.role !== "ADMIN") {
-    return { success: false, error: "Unauthorized Access. Area khusus Superadmin." };
-  }
+  if (!session || !session.user || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
 
-  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
-  const publicUrlBase = destination === "client" ? process.env.R2_CLIENT_PUBLIC_URL : process.env.R2_TEMPLATE_PUBLIC_URL;
+  const { bucketName, publicUrlBase } = getBucketConfig(destination);
+  if (!bucketName || !publicUrlBase) return { success: false, error: "Konfigurasi Bucket R2 tidak valid." };
 
-  if (!bucketName || !publicUrlBase) {
-    return { success: false, error: "Konfigurasi R2 di environment belum lengkap." };
-  }
-
-  // Format folder agar S3 mengerti (tambahkan slash di akhir jika masuk ke folder)
   let prefix = folderPrefix.replace(/^\/+/, ""); 
   if (prefix !== "" && !prefix.endsWith("/")) prefix += "/";
 
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
     Prefix: prefix,
-    Delimiter: "/", // SANGAT KRUSIAL: Ini yang membuat R2 mengelompokkan subfolder, bukan memuntahkan semua file
+    Delimiter: "/", 
   });
 
   try {
     const response = await r2Client.send(command);
     
-    // 1. Ekstrak 'Folder' dari CommonPrefixes
     const folders = (response.CommonPrefixes || []).map(p => {
-       // Buang path panjangnya, ambil nama ujung foldernya saja
        const name = p.Prefix?.replace(prefix, "").replace(/\/$/, "") || "unknown";
-       return { 
-         id: p.Prefix as string, 
-         name, 
-         type: 'folder' as const, 
-         lastModified: "--",
-         size: "--"
-       };
+       return { id: p.Prefix as string, name, type: 'folder' as const, lastModified: "--", size: "--" };
     });
 
-    // 2. Ekstrak 'File' dari Contents
     const files = (response.Contents || []).map(file => {
       const name = (file.Key as string).replace(prefix, "");
-      
-      // Lewati marker folder kosong (S3 biasanya menyimpan key berakhiran '/' sebagai penanda folder)
       if (name === "") return null; 
       
       const isImage = /\.(jpg|jpeg|png|gif|webp|svg|avif)$/i.test(name);
@@ -71,128 +72,126 @@ export async function listR2Files(destination: "client" | "template", folderPref
         size: formatBytes(file.Size || 0),
         lastModified: file.LastModified ? new Date(file.LastModified).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : "",
       };
-    }).filter(Boolean); // Buang array null
+    }).filter(Boolean);
 
-    // Gabungkan folder di atas, file di bawah
-    const combinedFiles = [...folders, ...files] as any[];
-
-    return { success: true, files: combinedFiles };
+    return { success: true, files: [...folders, ...files] };
   } catch (error: any) {
-    console.error("R2 Explorer Error:", error);
-    return { success: false, error: error.message || "Gagal mengambil data dari R2" };
+    return { success: false, error: "Gagal mengambil data dari R2" };
   }
 }
 
-export async function createR2Folder(destination: "client" | "template", currentPath: string, folderName: string) {
+// 2. CREATE FOLDER
+export async function createR2Folder(destination: R2Destination, currentPath: string, folderName: string) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
 
-  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
 
-  // Sanitasi nama folder: ubah spasi jadi strip, hapus karakter aneh
   const safeFolderName = folderName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   if (!safeFolderName) return { success: false, error: "Nama folder tidak valid." };
 
-  // S3 Folder Trick: Buat file 0 byte yang diakhiri dengan '/'
   const prefix = currentPath ? `${currentPath}/` : "";
   const folderKey = `${prefix}${safeFolderName}/`;
 
   try {
-    await r2Client.send(new PutObjectCommand({
-      Bucket: bucketName,
-      Key: folderKey,
-      Body: new Uint8Array(0), // 0 byte file
-    }));
+    await r2Client.send(new PutObjectCommand({ Bucket: bucketName, Key: folderKey, Body: new Uint8Array(0) }));
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     return { success: false, error: "Gagal membuat direktori." };
   }
 }
 
-export async function uploadR2File(destination: "client" | "template", currentPath: string, formData: FormData) {
+// 3. UPLOAD FILE
+export async function uploadR2File(destination: R2Destination, currentPath: string, formData: FormData) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
 
-  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  const { bucketName } = getBucketConfig(destination);
   const file = formData.get("file") as File;
   
   if (!bucketName || !file) return { success: false, error: "File atau Bucket tidak ditemukan." };
 
-  // Sanitasi nama file agar URL friendly
   const safeFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '-');
   const prefix = currentPath ? `${currentPath}/` : "";
   const fileKey = `${prefix}${safeFileName}`;
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    
-    await r2Client.send(new PutObjectCommand({
-      Bucket: bucketName,
-      Key: fileKey,
-      Body: buffer,
-      ContentType: file.type,
-    }));
-    
+    await r2Client.send(new PutObjectCommand({ Bucket: bucketName, Key: fileKey, Body: buffer, ContentType: file.type }));
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     return { success: false, error: "Gagal mengunggah aset." };
   }
 }
 
-export async function deleteR2Object(destination: "client" | "template", key: string) {
+// 4. DELETE OBJECT
+export async function deleteR2Object(destination: R2Destination, key: string) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
 
-  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
 
   try {
-    await r2Client.send(new DeleteObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-    }));
+    await r2Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     return { success: false, error: "Gagal menghapus aset dari Vault." };
   }
 }
 
-export async function renameR2File(destination: "client" | "template", oldKey: string, newFileName: string) {
+// 5. RENAME FILE
+export async function renameR2File(destination: R2Destination, oldKey: string, newFileName: string) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
 
-  const bucketName = destination === "client" ? process.env.R2_CLIENT_BUCKET : process.env.R2_TEMPLATE_BUCKET;
+  const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
 
-  // Ekstrak path direktori dari oldKey
   const pathParts = oldKey.split('/');
-  pathParts.pop(); // Buang nama file lama
+  pathParts.pop(); 
   const prefix = pathParts.length > 0 ? pathParts.join('/') + '/' : '';
   
-  // Sanitasi nama baru
   const safeNewName = newFileName.replace(/[^a-zA-Z0-9.\-_]/g, '-');
   const newKey = `${prefix}${safeNewName}`;
 
-  if (oldKey === newKey) return { success: true }; // Tidak ada perubahan
+  if (oldKey === newKey) return { success: true }; 
 
   try {
-    // 1. DUPLIKASI KE NAMA BARU
-    await r2Client.send(new CopyObjectCommand({
-      Bucket: bucketName,
-      CopySource: `${bucketName}/${oldKey}`, // Format wajib: bucket/key
-      Key: newKey,
-    }));
-
-    // 2. HAPUS FILE LAMA
-    await r2Client.send(new DeleteObjectCommand({
-      Bucket: bucketName,
-      Key: oldKey,
-    }));
-
+    await r2Client.send(new CopyObjectCommand({ Bucket: bucketName, CopySource: `${bucketName}/${oldKey}`, Key: newKey }));
+    await r2Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: oldKey }));
     return { success: true };
-  } catch (error: any) {
-    console.error("Rename Error:", error);
+  } catch (error) {
     return { success: false, error: "Gagal memanipulasi identitas objek R2." };
+  }
+}
+
+// 6. GENERATE PRE-SIGNED URL (DIRECT UPLOAD)
+export async function generatePresignedUrl(destination: R2Destination, currentPath: string, fileName: string, contentType: string) {
+  const session = await auth();
+  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const { bucketName } = getBucketConfig(destination);
+  if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
+
+  const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '-');
+  const prefix = currentPath ? `${currentPath}/` : "";
+  const fileKey = `${prefix}${safeFileName}`;
+
+  try {
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileKey,
+      ContentType: contentType, // Penting agar video/gambar bisa diputar di browser nantinya
+    });
+
+    // Tiket ini hanya valid selama 3600 detik (1 jam)
+    const signedUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+    
+    return { success: true, signedUrl, fileKey };
+  } catch (error) {
+    console.error("Presigned URL Error:", error);
+    return { success: false, error: "Gagal mencetak tiket unggahan." };
   }
 }

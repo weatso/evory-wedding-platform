@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -34,6 +32,20 @@ enum RsvpStatus {
   DECLINED
 }
 
+enum ServiceModule {
+  ONLINE_INVITATION
+  RSVP_VENUE_SYSTEM
+  CONTENT_CREATION
+  WHATSAPP_BLAST
+}
+
+enum EventType {
+  WEDDING
+  CORPORATE
+  BIRTHDAY
+  CUSTOM
+}
+
 // ==========================================
 // 2. AUTH MODELS (NextAuth / Auth.js)
 // ==========================================
@@ -47,16 +59,13 @@ model User {
   password      String?
   role          UserRole  @default(CLIENT)
 
-  // RELASI B2B: Siapa WO (Partner) yang mendaftarkan klien/usher ini?
   partnerId     String?
   partner       User?     @relation("PartnerToUsers", fields: [partnerId], references: [id])
   managedUsers  User[]    @relation("PartnerToUsers")
 
-  // IDENTITAS PARTNER (B2B)
-  companyName   String?    // Misal: "Radeva Wedding Organizer"
-  companyLogo   String?    // URL gambar logo Partner dari R2
+  companyName   String?   
+  companyLogo   String?   
 
-  // RELASI TEMPLATE: Template custom mana yang menjadi hak milik eksklusif user ini?
   customTemplates Template[] @relation("CustomTemplates")
 
   checkInsPerformed Guest[] @relation("UsherCheckIns")
@@ -65,8 +74,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   
-  // Relasi ke Invitation (Satu user bisa punya banyak undangan, misal: Resepsi Jakarta & Bali)
-  invitations   Invitation[]
+  // RELASI DIPERBAIKI: Mengarah ke Project, bukan Invitation
+  projects      Project[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -108,56 +117,37 @@ model VerificationToken {
 }
 
 // ==========================================
-// 3. BUSINESS MODELS (Tamu, Undangan & Tier)
+// 3. BUSINESS MODELS (Proyek, Tamu, & Modul)
 // ==========================================
 
-model Invitation {
-  id            String   @id @default(cuid())
-  slug          String   @unique // URL Undangan: evory.com/slug
-  isActive      Boolean  @default(true)
+model Project {
+  id            String          @id @default(cuid())
+  slug          String          @unique 
+  title         String          
+  isActive      Boolean         @default(true)
 
-  // Tier Paket yang membatasi akses klien
-  packageTier   PackageTier @default(ESSENTIAL)
-  
-  templateId  String?
-  template    Template? @relation(fields: [templateId], references: [id])
-  
-  // --- DATA MEMPELAI ---
-  groomName     String
-  groomNick     String
-  groomFather   String?
-  groomMother   String?
-  groomImageUrl String?
-  
-  brideName     String
-  brideNick     String
-  brideFather   String?
-  brideMother   String?
-  brideImageUrl String?
-  
-  // --- DATA ACARA ---
-  eventDate     DateTime
-  eventTime     String   @default("08:00 WIB - Selesai")
-  location      String
-  mapUrl        String?
+  eventType     EventType       @default(WEDDING)
+  activeModules ServiceModule[] 
 
-  checkInPin        String  @default("0000") // PIN untuk override/susulan
+  packageTier   PackageTier     @default(ESSENTIAL)
   
-  // --- ASET DIGITAL & KONFIGURASI ---
-  coverImageUrl String?
-  musicUrl      String?
-  gallery       String[] // Array URL Foto Gallery
-  themeConfig   Json?    // Simpan warna/font custom disini
+  templateId    String?
+  template      Template?       @relation(fields: [templateId], references: [id])
   
-  // --- RELASI ---
+  // SEMUA DATA SPESIFIK ACARA MASUK KE SINI (JSON)
+  // Tidak ada lagi musicUrl, coverImageUrl, atau checkInPin di tingkat akar.
+  eventMetadata Json?           
+  themeConfig   Json?    
+  gallery       String[] 
+  
   userId        String?
-  user          User?    @relation(fields: [userId], references: [id])
+  user          User?           @relation(fields: [userId], references: [id])
   
   guests        Guest[]
   wishes        Wish[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([slug])
 }
@@ -165,21 +155,18 @@ model Invitation {
 model Guest {
   id                String     @id @default(cuid())
   
-  // Identitas Tamu
   name              String
-  category          String?    // VIP, Keluarga, Teman Kantor
-  guestCode         String     @unique // Kode unik QR Code (misal: G-12345)
+  category          String?    
+  guestCode         String     @unique 
   whatsapp          String?
   
-  // RSVP & Kehadiran
   rsvpStatus        RsvpStatus @default(PENDING)
-  pax               Int        @default(1) // Jumlah tamu yang akan datang (Konfirmasi RSVP)
-  totalPaxAllocated Int        @default(1) // Jatah kuota undangan (Max Pax)
+  pax               Int        @default(1) 
+  totalPaxAllocated Int        @default(1) 
   
-  // Check-In (Buku Tamu Digital)
   isCheckedIn       Boolean    @default(false)
   checkInTime       DateTime?
-  checkInPin        String?    // Pin khusus jika tamu check-in mandiri
+  checkInPin        String?    
   
   checkedInById     String?    
   checkedInBy       User?      @relation("UsherCheckIns", fields: [checkedInById], references: [id])
@@ -187,9 +174,8 @@ model Guest {
   lastUpdatedById   String?    
   lastUpdatedByUser User?      @relation("UsherUpdates", fields: [lastUpdatedById], references: [id])
 
-  // Relasi
-  invitationId      String
-  invitation        Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  projectId         String
+  project           Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   wishes            Wish[]
 
@@ -200,10 +186,11 @@ model Guest {
 model Wish {
   id           String     @id @default(cuid())
   message      String     @db.Text
-  senderName   String?    // Nama pengirim (jika guest tidak login)
+  senderName   String?    
   
-  invitationId String
-  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  // RELASI DIPERBAIKI: Mengarah ke Project
+  projectId    String
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   guestId      String?
   guest        Guest?     @relation(fields: [guestId], references: [id])
@@ -217,15 +204,14 @@ model Wish {
 
 model TemplateCategory {
   id          String     @id @default(cuid())
-  name        String     // Javanese, Modern, Minimalist
-  slug        String     @unique // javanese-series
+  name        String     
+  slug        String     @unique 
   description String?
 
-  // TAMBAHKAN INI: Kontrol kurasi untuk Landing Page
   isFeatured  Boolean    @default(false)
-  sortOrder   Int        @default(0) // Untuk mengatur urutan manual di Etalase
+  sortOrder   Int        @default(0) 
   
-  templates   Template[] // Relasi One-to-Many
+  templates   Template[] 
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -233,33 +219,27 @@ model TemplateCategory {
 
 model Template {
   id          String           @id @default(cuid())
-  name        String           // Jvn-01 (Kraton)
-  slug        String           @unique // jvn-01 (Ini yang dipakai di URL)
-  description String?          // Deskripsi singkat
+  name        String           
+  slug        String           @unique 
+  description String?          
 
-  // TAMBAHKAN INI: Tidak semua template dalam kategori unggulan layak tampil di depan
   isFeatured  Boolean          @default(false)
-
-  // Mengunci template ke tier tertentu
   tier        PackageTier      @default(ESSENTIAL)
 
-  // Jika ini produk Full Custom yang Anda jual dengan harga premium
   ownerId     String?          
   owner       User?            @relation("CustomTemplates", fields: [ownerId], references: [id])
 
-  invitations Invitation[]
+  // RELASI DIPERBAIKI: Mengarah ke Project
+  projects    Project[]
   
-  // Tampilan di Katalog (Frontend)
-  thumbnail   String           // URL Gambar Preview
-  previewUrl  String?          // Link Demo Undangan
-  previewText String?          // Teks singkatan (JVN)
-  bgColor     String?          // Kode warna bg (bg-stone-900)
-  textColor   String?          // Kode warna text (text-gold)
+  thumbnail   String           
+  previewUrl  String?          
+  previewText String?          
+  bgColor     String?          
+  textColor   String?          
 
-  // Status
   isActive    Boolean          @default(true)
   
-  // Relasi
   categoryId  String
   category    TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   

@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { listR2Files, createR2Folder, uploadR2File, deleteR2Object, renameR2File } from "@/lib/actions/explorer";
+import { listR2Files, createR2Folder, deleteR2Object, renameR2File, generatePresignedUrl } from "@/lib/actions/explorer";
 
 type R2Object = {
   id: string;
@@ -21,7 +21,7 @@ type R2Object = {
 };
 
 export default function AssetVaultPage() {
-  const [destination, setDestination] = useState<"template" | "client">("template");
+  const [destination, setDestination] = useState<"template" | "client" | "wcc">("template");
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [files, setFiles] = useState<R2Object[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,6 +29,7 @@ export default function AssetVaultPage() {
   // States Interaksi
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +48,7 @@ export default function AssetVaultPage() {
     try {
       const folderPrefix = currentPath.length > 0 ? currentPath.join("/") : "";
       const res = await listR2Files(destination, folderPrefix);
-      if (res.success) setFiles(res.files || []);
+      if (res.success) setFiles((res.files as R2Object[]) || []);
       else setError(res.error || "Gagal memuat aset.");
     } catch (err) {
       setError("Koneksi ke R2 terputus.");
@@ -63,16 +64,50 @@ export default function AssetVaultPage() {
   // ==========================================
   const handleUpload = async (targetFile: File) => {
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", targetFile);
-    
+    setUploadProgress(0);
+
+    // 1. MINTA TIKET (PRE-SIGNED URL) KE VERCEL
     const folderPrefix = currentPath.length > 0 ? currentPath.join("/") : "";
-    const res = await uploadR2File(destination, folderPrefix, formData);
+    const ticketRes = await generatePresignedUrl(destination, folderPrefix, targetFile.name, targetFile.type);
     
-    if (res.success) fetchAssets();
-    else alert(res.error);
-    
-    setIsUploading(false);
+    if (!ticketRes.success || !ticketRes.signedUrl) {
+      alert(ticketRes.error || "Gagal mendapatkan izin akses dari server.");
+      setIsUploading(false);
+      return;
+    }
+
+    // 2. BYPASS VERCEL: UNGGAH LANGSUNG KE CLOUDFLARE R2
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", ticketRes.signedUrl, true);
+    xhr.setRequestHeader("Content-Type", targetFile.type);
+
+    // Lacak Persentase Unggahan
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percentComplete);
+      }
+    };
+
+    // Saat Selesai
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        fetchAssets(); // Refresh tabel file
+      } else {
+        alert("Gagal mengunggah aset secara langsung ke Cloudflare.");
+      }
+      setIsUploading(false);
+      setUploadProgress(0);
+    };
+
+    // Saat Koneksi Terputus
+    xhr.onerror = () => {
+      alert("Terjadi kesalahan jaringan. Cek koneksi internet Anda.");
+      setIsUploading(false);
+      setUploadProgress(0);
+    };
+
+    xhr.send(targetFile); // Tembakkan file raksasa!
   };
 
   const handleCreateFolder = async () => {
@@ -191,12 +226,14 @@ export default function AssetVaultPage() {
         
         <div className="flex gap-3 shrink-0 items-center">
           <div className="relative">
-            <select 
-              value={destination} onChange={(e) => { setDestination(e.target.value as "template" | "client"); setCurrentPath([]); }}
+           <select 
+              value={destination} 
+              onChange={(e) => { setDestination(e.target.value as "template" | "client" | "wcc"); setCurrentPath([]); }}
               className="h-10 appearance-none bg-white border border-slate-200 text-[#07303F] text-xs font-bold uppercase tracking-widest pl-4 pr-10 rounded-sm focus:outline-none cursor-pointer"
             >
               <option value="template">Template Registry</option>
               <option value="client">Client Uploads</option>
+              <option value="wcc">WCC Content Vault</option>
             </select>
             <ChevronRight className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 rotate-90 pointer-events-none" />
           </div>
@@ -252,9 +289,26 @@ export default function AssetVaultPage() {
         {/* TABLE VIEW */}
         <div className="flex-1 overflow-x-auto relative">
           {(isLoading || isUploading) && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-[#E5C185] mb-2" />
-              <p className="text-xs font-bold uppercase tracking-widest text-[#07303F]">{isUploading ? "Uploading..." : "Fetching Data..."}</p>
+            <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+              <Loader2 className="w-10 h-10 animate-spin text-[#E5C185] mb-4" />
+              <p className="text-sm font-bold uppercase tracking-widest text-[#07303F]">
+                {isUploading ? "Transmitting to Vault..." : "Fetching Data..."}
+              </p>
+              
+              {isUploading && uploadProgress > 0 && (
+                <div className="w-64 mt-4">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                    <span>Progress</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className="bg-[#E5C185] h-1.5 transition-all duration-300 ease-out" 
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
