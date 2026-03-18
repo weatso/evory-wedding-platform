@@ -20,7 +20,7 @@ export default async function ClientVaultPage({ params }: { params: { slug: stri
         return <div className="p-10 text-center text-red-500">Konfigurasi R2 Server belum diatur.</div>;
     }
 
-    const folderPrefix = `wcc/${params.slug}/`; 
+    const folderPrefix = `${params.slug}/`; 
     
     let files: { name: string; url: string; size: string; date: string; type: string }[] = [];
     let isError = false;

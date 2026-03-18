@@ -167,7 +167,77 @@ export async function renameR2File(destination: R2Destination, oldKey: string, n
   }
 }
 
-// 6. GENERATE PRE-SIGNED URL (DIRECT UPLOAD)
+// 6. LIST ALL FOLDERS (UNTUK MODAL PINDAH FILE)
+export async function listR2Folders(destination: R2Destination, prefix: string = ""): Promise<string[]> {
+  const session = await auth();
+  if (!session || !session.user || session.user.role !== "ADMIN") return [];
+
+  const { bucketName } = getBucketConfig(destination);
+  if (!bucketName) return [];
+
+  try {
+    const command = new ListObjectsV2Command({
+      Bucket: bucketName,
+      Prefix: prefix,
+      Delimiter: "/",
+    });
+
+    const response = await r2Client.send(command);
+    const folders: string[] = [];
+
+    for (const cp of response.CommonPrefixes || []) {
+      if (cp.Prefix) {
+        folders.push(cp.Prefix);
+        // Rekursif ambil subfolder
+        const subFolders = await listR2Folders(destination, cp.Prefix);
+        folders.push(...subFolders);
+      }
+    }
+
+    return folders;
+  } catch {
+    return [];
+  }
+}
+
+// 7. MOVE FILE (PINDAH FILE KE FOLDER LAIN)
+export async function moveR2File(destination: R2Destination, sourceKey: string, targetFolder: string) {
+  const session = await auth();
+  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const { bucketName } = getBucketConfig(destination);
+  if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
+
+  // Ambil nama file dari source key
+  const fileName = sourceKey.split('/').pop();
+  if (!fileName) return { success: false, error: "Nama file tidak valid." };
+
+  // Susun key tujuan
+  const newKey = targetFolder ? `${targetFolder}${fileName}` : fileName;
+
+  if (sourceKey === newKey) return { success: false, error: "File sudah berada di folder tujuan." };
+
+  try {
+    // Copy ke lokasi baru
+    await r2Client.send(new CopyObjectCommand({
+      Bucket: bucketName,
+      CopySource: `${bucketName}/${sourceKey}`,
+      Key: newKey,
+    }));
+
+    // Hapus file lama
+    await r2Client.send(new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: sourceKey,
+    }));
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Gagal memindahkan file." };
+  }
+}
+
+// 8. GENERATE PRE-SIGNED URL (DIRECT UPLOAD)
 export async function generatePresignedUrl(destination: R2Destination, currentPath: string, fileName: string, contentType: string) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };

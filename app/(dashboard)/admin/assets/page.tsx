@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Folder, Image as ImageIcon, Trash2, Copy, 
   UploadCloud, ChevronRight, Search, Home,
-  RefreshCw, FileText, Loader2, FolderPlus, X, Edit2
+  RefreshCw, FileText, Loader2, FolderPlus, X, Edit2, MoveRight,
+  CheckSquare, Square
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { listR2Files, createR2Folder, deleteR2Object, renameR2File, generatePresignedUrl } from "@/lib/actions/explorer";
+import { listR2Files, createR2Folder, deleteR2Object, renameR2File, generatePresignedUrl, listR2Folders, moveR2File } from "@/lib/actions/explorer";
 
 type R2Object = {
   id: string;
@@ -39,6 +40,15 @@ export default function AssetVaultPage() {
   
   const [renameTarget, setRenameTarget] = useState<R2Object | null>(null);
   const [newFileName, setNewFileName] = useState("");
+
+  // States Move File (Batch)
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [availableFolders, setAvailableFolders] = useState<string[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>("");
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
+
+  // States Selection
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -156,6 +166,71 @@ export default function AssetVaultPage() {
     }
   };
 
+  // Selection Helpers
+  const toggleSelect = (id: string) => {
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const selectableFiles = filteredFiles.filter(f => f.type !== 'folder');
+    if (selectedFiles.size === selectableFiles.length && selectableFiles.length > 0) {
+      setSelectedFiles(new Set());
+    } else {
+      setSelectedFiles(new Set(selectableFiles.map(f => f.id)));
+    }
+  };
+
+  const openBatchMoveModal = async (singleFile?: R2Object) => {
+    if (singleFile) {
+      setSelectedFiles(new Set([singleFile.id]));
+    }
+    setSelectedFolder("");
+    setShowMoveModal(true);
+    setIsLoadingFolders(true);
+    const folders = await listR2Folders(destination);
+    setAvailableFolders(["/", ...folders]);
+    setIsLoadingFolders(false);
+  };
+
+  const handleBatchMove = async () => {
+    if (selectedFiles.size === 0) return;
+    setIsLoading(true);
+    setShowMoveModal(false);
+
+    const targetFolder = selectedFolder === "/" ? "" : selectedFolder;
+    let failCount = 0;
+
+    for (const fileId of selectedFiles) {
+      const res = await moveR2File(destination, fileId, targetFolder);
+      if (!res.success) failCount++;
+    }
+
+    setSelectedFiles(new Set());
+    if (failCount > 0) alert(`${failCount} file gagal dipindahkan.`);
+    fetchAssets();
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedFiles.size === 0) return;
+    if (!window.confirm(`Yakin ingin menghapus ${selectedFiles.size} file secara permanen?`)) return;
+
+    setIsLoading(true);
+    let failCount = 0;
+
+    for (const fileId of selectedFiles) {
+      const res = await deleteR2Object(destination, fileId);
+      if (!res.success) failCount++;
+    }
+
+    setSelectedFiles(new Set());
+    if (failCount > 0) alert(`${failCount} file gagal dihapus.`);
+    fetchAssets();
+  };
+
   // Drag & Drop Handlers
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
@@ -165,9 +240,9 @@ export default function AssetVaultPage() {
   };
 
   // Navigasi
-  const handleNavigate = (folderName: string) => setCurrentPath([...currentPath, folderName]);
-  const handleBreadcrumb = (index: number) => setCurrentPath(currentPath.slice(0, index + 1));
-  const goHome = () => setCurrentPath([]);
+  const handleNavigate = (folderName: string) => { setSelectedFiles(new Set()); setCurrentPath([...currentPath, folderName]); };
+  const handleBreadcrumb = (index: number) => { setSelectedFiles(new Set()); setCurrentPath(currentPath.slice(0, index + 1)); };
+  const goHome = () => { setSelectedFiles(new Set()); setCurrentPath([]); };
 
   const filteredFiles = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -212,6 +287,53 @@ export default function AssetVaultPage() {
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setRenameTarget(null)}>Cancel</Button>
               <Button onClick={handleRename} className="bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074]">Save Changes</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BATCH MOVE */}
+      {showMoveModal && (
+        <div className="fixed inset-0 bg-[#07303F]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#F9F8F4] w-full max-w-md rounded-xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-serif italic font-bold text-[#07303F]">Move Files</h2>
+              <button onClick={() => setShowMoveModal(false)} className="text-slate-400 hover:text-red-500"><X size={20}/></button>
+            </div>
+            <p className="text-sm text-slate-500 mb-1">Memindahkan:</p>
+            <p className="text-sm font-bold text-[#07303F] mb-4">{selectedFiles.size} file dipilih</p>
+            <p className="text-sm text-slate-500 mb-2">Pilih folder tujuan:</p>
+            {isLoadingFolders ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-[#E5C185]" />
+              </div>
+            ) : (
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg mb-4">
+                {availableFolders.map((folder) => (
+                  <button
+                    key={folder}
+                    onClick={() => setSelectedFolder(folder)}
+                    className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 transition-colors ${
+                      selectedFolder === folder
+                        ? 'bg-[#07303F] text-[#E5C185] font-bold'
+                        : 'hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <Folder className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{folder === "/" ? "/ (root)" : folder}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowMoveModal(false)}>Cancel</Button>
+              <Button
+                onClick={handleBatchMove}
+                disabled={!selectedFolder || isLoadingFolders}
+                className="bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074] disabled:opacity-50"
+              >
+                <MoveRight className="w-4 h-4 mr-2" /> Move {selectedFiles.size} Files
+              </Button>
             </div>
           </div>
         </div>
@@ -315,7 +437,14 @@ export default function AssetVaultPage() {
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead className="bg-white border-b border-slate-100 text-[10px] font-bold uppercase tracking-widest text-slate-400">
               <tr>
-                <th className="px-6 py-4 font-bold w-1/2">Nama File / Folder</th>
+                <th className="pl-4 pr-0 py-4 w-10">
+                  <button onClick={toggleSelectAll} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-[#07303F]">
+                    {selectedFiles.size > 0 && selectedFiles.size === filteredFiles.filter(f => f.type !== 'folder').length
+                      ? <CheckSquare className="w-4 h-4" />
+                      : <Square className="w-4 h-4" />}
+                  </button>
+                </th>
+                <th className="px-3 py-4 font-bold">Nama File / Folder</th>
                 <th className="px-6 py-4 font-bold w-1/6">Ukuran</th>
                 <th className="px-6 py-4 font-bold w-1/4">Terakhir Diubah</th>
                 <th className="px-6 py-4 font-bold text-right">Aksi</th>
@@ -324,15 +453,24 @@ export default function AssetVaultPage() {
             <tbody className="divide-y divide-slate-50 text-sm">
               {filteredFiles.length === 0 && !isLoading && !isUploading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-32 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-32 text-center text-slate-400">
                     <Folder className="w-12 h-12 mx-auto mb-4 opacity-20 text-[#07303F]" />
                     <p className="font-serif italic text-lg text-[#07303F]">Direktori Kosong.</p>
                   </td>
                 </tr>
               ) : (
                 filteredFiles.map((file) => (
-                  <tr key={file.id} className="hover:bg-[#F9F8F4] transition-colors group cursor-pointer" onDoubleClick={() => file.type === 'folder' ? handleNavigate(file.name) : null}>
-                    <td className="px-6 py-3">
+                  <tr key={file.id} className={`transition-colors group cursor-pointer ${selectedFiles.has(file.id) ? 'bg-blue-50' : 'hover:bg-[#F9F8F4]'}`} onDoubleClick={() => file.type === 'folder' ? handleNavigate(file.name) : null}>
+                    <td className="pl-4 pr-0 py-3 w-10">
+                      {file.type !== 'folder' ? (
+                        <button onClick={() => toggleSelect(file.id)} className="p-1 hover:bg-slate-100 rounded">
+                          {selectedFiles.has(file.id)
+                            ? <CheckSquare className="w-4 h-4 text-[#07303F]" />
+                            : <Square className="w-4 h-4 text-slate-300" />}
+                        </button>
+                      ) : <div className="w-6" />}
+                    </td>
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${file.type === 'folder' ? 'bg-[#07303F]/5 text-[#07303F]' : file.type === 'image' ? 'bg-[#E5C185]/20 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                           {file.type === 'folder' ? <Folder className="w-5 h-5 fill-[#07303F]/20" /> : file.type === 'image' ? <ImageIcon className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
@@ -352,6 +490,7 @@ export default function AssetVaultPage() {
                           <>
                             <button onClick={() => { navigator.clipboard.writeText(file.url || ""); alert("URL Disalin!"); }} className="p-1.5 text-slate-400 hover:text-[#07303F] hover:bg-slate-200 rounded" title="Copy URL"><Copy className="w-4 h-4" /></button>
                             <button onClick={() => { setRenameTarget(file); setNewFileName(file.name); }} className="p-1.5 text-slate-400 hover:text-[#07303F] hover:bg-slate-200 rounded" title="Rename File"><Edit2 className="w-4 h-4" /></button>
+                            <button onClick={() => openBatchMoveModal(file)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="Move File"><MoveRight className="w-4 h-4" /></button>
                           </>
                         )}
                         
@@ -367,6 +506,23 @@ export default function AssetVaultPage() {
           </table>
         </div>
       </div>
+
+      {/* FLOATING BATCH ACTION BAR */}
+      {selectedFiles.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#07303F] text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-4">
+          <span className="text-sm font-bold">{selectedFiles.size} file dipilih</span>
+          <div className="w-px h-6 bg-white/20" />
+          <Button onClick={() => openBatchMoveModal()} size="sm" className="bg-white/10 hover:bg-[#E5C185] hover:text-[#07303F] text-white text-xs">
+            <MoveRight className="w-4 h-4 mr-1" /> Pindahkan
+          </Button>
+          <Button onClick={handleBatchDelete} size="sm" variant="destructive" className="text-xs">
+            <Trash2 className="w-4 h-4 mr-1" /> Hapus
+          </Button>
+          <button onClick={() => setSelectedFiles(new Set())} className="text-slate-400 hover:text-white ml-2">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
