@@ -1,4 +1,4 @@
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, ListObjectsV2CommandOutput, _Object } from "@aws-sdk/client-s3";
 import { r2Client } from "@/lib/r2";
 import { HardDrive, Download, FileVideo, FileImage, File as FileIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,46 +12,56 @@ function formatBytes(bytes: number, decimals = 1) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-// Halaman ini di-render di server setiap kali klien membukanya
 export default async function ClientVaultPage({ params }: { params: { slug: string } }) {
-    const bucketName = process.env.R2_WCC_BUCKET;
-    const publicUrlBase = process.env.R2_WCC_PUBLIC_URL;
+    const bucketName = process.env.R2_WCC_BUCKET || process.env.R2_CLIENT_BUCKET;
+    const publicUrlBase = process.env.R2_WCC_PUBLIC_URL || process.env.R2_CLIENT_PUBLIC_URL;
     
     if (!bucketName || !publicUrlBase) {
         return <div className="p-10 text-center text-red-500">Konfigurasi R2 Server belum diatur.</div>;
     }
 
-    const folderPrefix = `${params.slug}/`;
-    let files: any[] = [];
+    const folderPrefix = `wcc/${params.slug}/`; 
+    
+    let files: { name: string; url: string; size: string; date: string; type: string }[] = [];
     let isError = false;
 
     try {
-        // Tembak langsung ke Cloudflare R2, minta isi dari folder slug ini
-        const command = new ListObjectsV2Command({
-            Bucket: bucketName,
-            Prefix: folderPrefix,
-        });
+        let isTruncated = true;
+        let continuationToken: string | undefined = undefined;
 
-        const response = await r2Client.send(command);
-        
-        files = (response.Contents || [])
-            .filter(file => file.Key !== folderPrefix) // Abaikan objek direktori kosong
-            .map(file => {
-                const fileName = (file.Key as string).replace(folderPrefix, "");
-                const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
-                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
-                
-                return {
-                    name: fileName,
-                    url: `${publicUrlBase}/${file.Key}`,
-                    size: formatBytes(file.Size || 0),
-                    date: file.LastModified ? new Date(file.LastModified).toLocaleDateString('id-ID') : "",
-                    type: isVideo ? "video" : isImage ? "image" : "document"
-                };
+        while (isTruncated) {
+            const command: ListObjectsV2Command = new ListObjectsV2Command({
+                Bucket: bucketName,
+                Prefix: folderPrefix,
+                ContinuationToken: continuationToken,
             });
 
+            const response: ListObjectsV2CommandOutput = await r2Client.send(command);
+            
+            const batchFiles = (response.Contents || [])
+                .filter((file: _Object) => file.Key !== folderPrefix && (file.Size ?? 0) > 0) 
+                .map((file: _Object) => {
+                    const key = file.Key as string;
+                    const fileName = key.replace(folderPrefix, "");
+                    const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
+                    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                    
+                    return {
+                        name: fileName,
+                        url: `${publicUrlBase}/${key}`,
+                        size: formatBytes(file.Size || 0),
+                        date: file.LastModified ? new Date(file.LastModified).toLocaleDateString('id-ID') : "",
+                        type: isVideo ? "video" : isImage ? "image" : "document"
+                    };
+                });
+
+            files.push(...batchFiles);
+
+            isTruncated = !!response.IsTruncated;
+            continuationToken = response.NextContinuationToken;
+        }
+
     } catch (error) {
-        console.error("S3 Fetch Error:", error);
         isError = true;
     }
 
@@ -69,7 +79,7 @@ export default async function ClientVaultPage({ params }: { params: { slug: stri
                     Media <span className="text-[#E5C185]">Vault.</span>
                 </h1>
                 <p className="text-slate-400 max-w-xl text-sm leading-relaxed">
-                    Ruang kerja eksklusif untuk kampanye <span className="text-white font-bold">{params.slug}</span>. Seluruh aset beresolusi tinggi (RAW & Final) tersedia untuk diunduh di bawah ini.
+                    Ruang kerja eksklusif untuk kampanye <span className="text-white font-bold">{params.slug}</span>. Seluruh aset beresolusi tinggi ({files.length} File) tersedia untuk diunduh di bawah ini.
                 </p>
             </div>
 
@@ -89,12 +99,12 @@ export default async function ClientVaultPage({ params }: { params: { slug: stri
                         {files.map((file, idx) => (
                             <div key={idx} className="group p-5 border border-white/10 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-300 flex flex-col justify-between h-48">
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-[#07303F] border border-white/10 rounded-lg shadow-inner">
+                                    <div className="p-3 bg-[#07303F] border border-white/10 rounded-lg shadow-inner shrink-0">
                                         {file.type === "video" ? <FileVideo className="text-blue-400 w-6 h-6" /> : 
                                          file.type === "image" ? <FileImage className="text-pink-400 w-6 h-6" /> : 
                                          <FileIcon className="text-slate-400 w-6 h-6" />}
                                     </div>
-                                    <div className="overflow-hidden">
+                                    <div className="overflow-hidden w-full">
                                         <h3 className="font-bold text-sm truncate w-full group-hover:text-[#E5C185] transition-colors" title={file.name}>
                                             {file.name}
                                         </h3>
