@@ -1,93 +1,76 @@
-// app/(dashboard)/admin/users/actions.ts
-'use server';
+"use server";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+// Skema untuk menambah pengguna baru (Client, Partner, atau Usher)
+const AddUserSchema = z.object({
+  name: z.string().min(1, "Nama wajib diisi"),
+  email: z.string().email("Format email tidak valid"),
+  password: z.string().min(6, "Password minimal 6 karakter"),
+  role: z.enum(["ADMIN", "PARTNER", "USHER", "CLIENT"]),
+});
+
+// Tipe state yang benar sesuai error TypeScript Anda (menggunakan 'errors')
 export type ActionState = {
-  message: string | null;
-  errors?: { [key: string]: string[] };
+  errors?: string;
   success?: boolean;
 };
 
-const AddUserSchema = z.object({
-  name: z.string().min(1, "Nama harus diisi"),
-  role: z.enum(["ADMIN", "PARTNER", "CLIENT", "USHER"]), 
-  email: z.string().email("Format email tidak valid"),
-  password: z.string().min(6, "Password minimal 6 karakter"),
-  groomName: z.string().min(1, "Nama Pria harus diisi"),
-  brideName: z.string().min(1, "Nama Wanita harus diisi"),
-  slug: z.string().min(3, "Slug minimal 3 karakter").regex(/^[a-z0-9-]+$/, "Slug hanya boleh huruf kecil, angka, dan strip (-)"),
-  eventDate: z.string().refine((val) => !isNaN(Date.parse(val)), "Tanggal tidak valid"),
-});
-
-export async function addUser(prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function addUserAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   const session = await auth();
   const userRole = session?.user?.role;
   const userId = session?.user?.id;
 
-  // 1. Cek Autentikasi Admin/Partner
+  // Hanya Admin dan Partner yang boleh membuat akun baru
   if (userRole !== "ADMIN" && userRole !== "PARTNER") {
-      return { message: "Unauthorized: Anda tidak memiliki akses.", success: false };
+    return { errors: "Unauthorized: Akses ditolak." };
   }
 
   const rawData = {
-    name: formData.get("name"), role: formData.get("role"), email: formData.get("email"),
-    password: formData.get("password"), groomName: formData.get("groomName"),
-    brideName: formData.get("brideName"), slug: formData.get("slug"), eventDate: formData.get("eventDate"),
+    name: formData.get("name"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+    role: formData.get("role"),
   };
 
-  const validated = AddUserSchema.safeParse(rawData);
-  if (!validated.success) return { message: "Data tidak valid.", errors: validated.error.flatten().fieldErrors, success: false };
-
-  const data = validated.data;
-
-  // 2. Cegah Partner Membuat Admin/Partner Baru
-  if (userRole === "PARTNER" && (data.role === "ADMIN" || data.role === "PARTNER")) {
-     return { message: "Akses Ditolak: Partner hanya bisa membuat Client atau Usher.", success: false };
+  const validation = AddUserSchema.safeParse(rawData);
+  if (!validation.success) {
+    return { errors: "Data form tidak valid. Pastikan semua field terisi dengan benar." };
   }
 
-  const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
-  if (existingUser) return { message: "Email ini sudah terdaftar.", errors: { email: ["Gunakan email lain."] }, success: false };
+  const { name, email, password, role } = validation.data;
 
-  const existingSlug = await prisma.invitation.findUnique({ where: { slug: data.slug } });
-  if (existingSlug) return { message: "Slug URL ini sudah dipakai.", errors: { slug: ["Ganti dengan URL lain."] }, success: false };
+  // Lapis Pertahanan: Partner hanya boleh menciptakan Usher atau Client
+  if (userRole === "PARTNER" && role !== "USHER" && role !== "CLIENT") {
+    return { errors: "Pelanggaran Hak Akses: Anda tidak diizinkan membuat akun dengan peran ini." };
+  }
 
   try {
-    const hashedPassword = await hash(data.password, 10);
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) return { errors: "Email ini sudah terdaftar di sistem." };
 
-    await prisma.$transaction(async (tx) => {
-      // Create User (SUNTIKKAN partnerId JIKA YANG MEMBUAT ADALAH PARTNER)
-      const newUser = await tx.user.create({
-        data: {
-          name: data.name,
-          email: data.email,
-          password: hashedPassword,
-          role: data.role as any,
-          partnerId: userRole === "PARTNER" ? userId : undefined, // IKATAN MUTLAK B2B
-        },
-      });
+    const hashedPassword = await hash(password, 10);
 
-      if (data.role === "CLIENT") {
-          await tx.invitation.create({
-            data: {
-              slug: data.slug, userId: newUser.id, groomName: data.groomName, groomNick: data.groomName.split(" ")[0], 
-              groomFather: "Bapak Pria", groomMother: "Ibu Pria", brideName: data.brideName, brideNick: data.brideName.split(" ")[0], 
-              brideFather: "Bapak Wanita", brideMother: "Ibu Wanita", eventDate: new Date(data.eventDate), location: "Lokasi Belum Diisi", isActive: true,
-            },
-          });
-      }
+    // Murni hanya membuat akun, tidak menyentuh proyek/undangan
+    await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role,
+        partnerId: userRole === "PARTNER" ? userId : undefined,
+      },
     });
 
+    revalidatePath("/admin/users");
+    return { success: true };
+    
   } catch (error) {
-    console.error("Gagal tambah user:", error);
-    return { message: "Terjadi kesalahan sistem saat menyimpan data.", success: false };
+    console.error("Add User Error:", error);
+    return { errors: "Gagal menyimpan data pengguna ke database." };
   }
-
-  revalidatePath("/admin");
-  redirect("/admin");
 }

@@ -1,125 +1,76 @@
-'use client'
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import AddStaffModal from "../_components/AddStaffModal"; // Sesuaikan path ini jika komponennya ada di tempat lain
 
-import { useActionState } from "react";
-import { addUser, ActionState } from "./actions"; 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import Link from "next/link";            // <-- Tambahan Import
-import { ArrowLeft } from "lucide-react"; // <-- Tambahan Import Icon
+export default async function AdminUsersPage() {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") redirect("/");
 
-// Initial State kosong
-const initialState: ActionState = {
-    message: null,
-    errors: {},
-    success: false
-}
+    // Tarik data pengguna beserta jumlah PROYEK yang mereka miliki
+    const users = await prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+            _count: {
+                select: { projects: true } // Murni menghitung relasi proyek
+            }
+        }
+    });
 
-export default function AdminAddUserPage() {
-  const [state, formAction, isPending] = useActionState(addUser, initialState);
-
-  return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 relative font-sans">
-      
-      {/* --- TOMBOL KEMBALI (FIX) --- */}
-      <div className="absolute top-4 left-4 md:top-6 md:left-6">
-        <Link href="/admin">
-            <Button variant="ghost" className="text-slate-600 hover:text-slate-900 gap-2">
-                <ArrowLeft className="w-4 h-4" /> 
-                <span className="hidden md:inline">Kembali ke Admin</span>
-                <span className="md:hidden">Kembali</span>
-            </Button>
-        </Link>
-      </div>
-      {/* --------------------------- */}
-
-      <div className="max-w-2xl mx-auto mt-8 md:mt-0">
-          <div className="text-center mb-8">
-             <h1 className="text-3xl font-bold text-slate-900">Tambah Client Baru</h1>
-             <p className="text-slate-500 mt-2">Buat akun login sekaligus project undangan awal.</p>
-          </div>
-          
-          {/* Alert Global Message */}
-          {state.message && (
-            <div className={`p-4 rounded-lg mb-6 text-sm font-bold border flex items-center gap-2 ${state.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                <span>{state.success ? '✅ ' : '⚠️ '}</span>
-                {state.message}
-            </div>
-          )}
-
-          <form action={formAction} className="space-y-6 border border-slate-200 p-6 md:p-8 rounded-xl bg-white shadow-sm">
-            
-            {/* DATA AKUN LOGIN */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Nama Client (User)</Label>
-                    <Input name="name" placeholder="Romeo Montague" required />
-                    {state.errors?.name && <p className="text-red-500 text-xs">{state.errors.name[0]}</p>}
+    return (
+        <div className="p-4 md:p-8 space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-serif italic font-bold text-[#07303F]">Manajemen Klien & Tim</h1>
+                    <p className="text-slate-500 text-sm mt-1">Kelola hak akses, klien, dan alokasi proyek (WCC & Wedding).</p>
                 </div>
-                <div className="space-y-2">
-                    <Label>Role</Label>
-                    <select name="role" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <option value="CLIENT">Client (Mempelai)</option>
-                        <option value="ADMIN">Admin / Staff</option>
-                    </select>
-                </div>
+                {/* Asumsikan Anda memiliki komponen modal untuk tambah staff/klien cepat */}
+                <AddStaffModal roleOptions={["ADMIN", "PARTNER", "USHER"]} /> 
             </div>
 
-            <div className="space-y-2">
-                <Label>Email Login</Label>
-                <Input name="email" type="email" placeholder="client@email.com" required />
-                {state.errors?.email && <p className="text-red-500 text-xs">{state.errors.email[0]}</p>}
-            </div>
-
-            <div className="space-y-2">
-                <Label>Password Awal</Label>
-                <Input name="password" type="text" placeholder="min. 6 karakter" required />
-                <p className="text-xs text-slate-400">Info ini wajib dicatat & diberikan ke klien.</p>
-                {state.errors?.password && <p className="text-red-500 text-xs">{state.errors.password[0]}</p>}
-            </div>
-
-            {/* DATA UNDANGAN AWAL */}
-            <div className="border-t border-slate-100 pt-6 mt-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="h-6 w-1 bg-amber-500 rounded-full"></div>
-                    <p className="font-bold text-sm text-slate-900 uppercase tracking-wider">Setup Undangan Awal</p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                     <div className="space-y-2">
-                        <Label>Nama Pria</Label>
-                        <Input name="groomName" required />
-                        {state.errors?.groomName && <p className="text-red-500 text-xs">{state.errors.groomName[0]}</p>}
-                     </div>
-                     <div className="space-y-2">
-                        <Label>Nama Wanita</Label>
-                        <Input name="brideName" required />
-                        {state.errors?.brideName && <p className="text-red-500 text-xs">{state.errors.brideName[0]}</p>}
-                     </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                        <Label>Slug URL (Unik)</Label>
-                        <div className="flex">
-                            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm">/</span>
-                            <Input name="slug" placeholder="romeo-juliet" className="rounded-l-none" required />
-                        </div>
-                        {state.errors?.slug && <p className="text-red-500 text-xs">{state.errors.slug[0]}</p>}
-                     </div>
-                     <div className="space-y-2">
-                        <Label>Tanggal Acara</Label>
-                        <Input name="eventDate" type="datetime-local" required />
-                        {state.errors?.eventDate && <p className="text-red-500 text-xs">{state.errors.eventDate[0]}</p>}
-                     </div>
-                </div>
-            </div>
-
-            <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white h-12 mt-6 shadow-lg" disabled={isPending}>
-                {isPending ? "Sedang Memproses..." : "Simpan & Buat Undangan"}
-            </Button>
-          </form>
-      </div>
-    </div>
-  );
+            <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-slate-50 border-b border-slate-200">
+                            <TableRow>
+                                <TableHead className="font-bold text-[#07303F] uppercase tracking-widest text-[10px]">Nama</TableHead>
+                                <TableHead className="font-bold text-[#07303F] uppercase tracking-widest text-[10px]">Email</TableHead>
+                                <TableHead className="font-bold text-[#07303F] uppercase tracking-widest text-[10px]">Peran (Role)</TableHead>
+                                <TableHead className="font-bold text-[#07303F] uppercase tracking-widest text-[10px]">Alokasi Proyek</TableHead>
+                                <TableHead className="font-bold text-[#07303F] uppercase tracking-widest text-[10px] text-right">Terdaftar</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {users.map(user => (
+                                <TableRow key={user.id} className="hover:bg-slate-50/50">
+                                    <TableCell className="font-bold text-[#07303F]">{user.name || "Anonim"}</TableCell>
+                                    <TableCell className="text-slate-600 text-sm">{user.email}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={
+                                            user.role === "ADMIN" ? "bg-red-50 text-red-700 border-red-200 font-bold" :
+                                            user.role === "PARTNER" ? "bg-blue-50 text-blue-700 border-blue-200 font-bold" :
+                                            "bg-slate-100 text-slate-600 border-slate-200 font-bold"
+                                        }>
+                                            {user.role}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge className="bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074] border-0 font-bold">
+                                            {user._count.projects} Proyek Aktif
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-slate-500 text-xs text-right font-medium">
+                                        {new Date(user.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
+    );
 }

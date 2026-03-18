@@ -23,20 +23,20 @@ export default async function AdminDashboardPage() {
       : { partnerId: session.user.id, role: "CLIENT" }, // Jika Partner -> Tampilkan klien milik partner tersebut
     orderBy: { createdAt: "desc" },
     include: {
-      _count: {
-        select: {
-          managedUsers: true, // Untuk Admin melihat jumlah klien WO
-          invitations: true,  // Untuk Partner melihat jumlah undangan klien
+        _count: {
+          select: {
+            managedUsers: true,
+            projects: true, // PERBAIKAN: Gunakan relasi tabel yang baru
+          }
         }
       }
-    }
   });
 
   const totalUsers = users.length;
   // Jika Admin, hitung total klien dari semua partner. Jika Partner, itu sudah total klien.
   const totalSubUsers = isAdmin 
     ? users.reduce((sum, u) => sum + u._count.managedUsers, 0)
-    : users.reduce((sum, u) => sum + u._count.invitations, 0);
+    : users.reduce((sum, u) => sum + u._count.projects, 0);
 
   return (
     <div className="space-y-8 lg:space-y-12 pb-20">
@@ -142,7 +142,7 @@ export default async function AdminDashboardPage() {
                     </td>
                     <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center justify-center min-w-[2rem] h-6 bg-[#F9F8F4] border border-slate-200 rounded-sm text-xs font-bold text-[#07303F]">
-                            {isAdmin ? u._count.managedUsers : u._count.invitations}
+                            {isAdmin ? u._count.managedUsers : u._count.projects}
                         </span>
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-500 font-medium">

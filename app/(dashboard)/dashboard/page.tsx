@@ -9,7 +9,7 @@ export default async function ClientDashboardPage() {
   const session = await auth();
   if (!session || !session.user) redirect("/login");
 
-  // Cari proyek klien ini (Gunakan findFirst untuk menyederhanakan jika 1 user = 1 project aktif)
+  // 1. Ambil Proyek & Relasinya secara presisi
   const project = await prisma.project.findFirst({
     where: { 
       userId: session.user.id,
@@ -17,7 +17,9 @@ export default async function ClientDashboardPage() {
     },
     include: {
       guests: true,
-      wishes: true
+      wishes: {
+        include: { guest: true } // WAJIB ADA: Agar UI bisa membaca nama tamu dari relasi
+      }
     }
   });
 
@@ -30,20 +32,27 @@ export default async function ClientDashboardPage() {
     );
   }
 
+  // 2. Ambil Katalog Template untuk diserahkan ke WeddingOverview
+  const availableTemplates = await prisma.template.findMany({
+    where: { isActive: true },
+    select: {
+      id: true, name: true, slug: true, thumbnail: true, tier: true, 
+      category: { select: { name: true } }
+    },
+    orderBy: { tier: 'desc' }
+  });
+
   const activeModules = project.activeModules || [];
 
   // GATEKEEPER LOGIC
-
-  // 1. Jika Klien murni WCC
   if (activeModules.includes(ServiceModule.CONTENT_CREATION) && !activeModules.includes(ServiceModule.ONLINE_INVITATION)) {
     return <WccOverview project={project} />;
   }
 
-  // 2. Jika Klien Pernikahan
   if (activeModules.includes(ServiceModule.ONLINE_INVITATION) || activeModules.includes(ServiceModule.RSVP_VENUE_SYSTEM)) {
-    return <WeddingOverview project={project} />;
+    // Serahkan project dan templates ke komponen anak
+    return <WeddingOverview project={project} templates={availableTemplates} />;
   }
 
-  // 3. Fallback
   return <div className="p-8">Modul tidak terdeteksi. Hubungi Admin.</div>;
 }
