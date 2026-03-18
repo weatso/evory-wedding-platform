@@ -1,56 +1,53 @@
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma"; // Pastikan menggunakan instance prisma yang benar
+"use client"; // Ubah menjadi client component khusus untuk hari ini agar bisa pakai alert
+
+import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import ClientAssetsForm from "../ClientAssetsForm"; 
+import SimpleUploadButton from "@/components/dashboard/SimpleUploadButton";
 
-type Props = {
-  searchParams: Promise<{ viewAs?: string }>;
-};
+export default function MediaPage() {
+  const { data: session, status } = useSession();
 
-export default async function MediaPage(props: Props) {
-  const session = await auth();
+  if (status === "loading") return <div>Memuat...</div>;
   if (!session) redirect("/login");
 
-  const searchParams = await props.searchParams;
-  const viewAsId = searchParams.viewAs;
   const userRole = session.user.role;
   
-  const targetUserId = (userRole === "ADMIN" && viewAsId) ? viewAsId : session.user.id; 
+  // =====================================================================
+  // JALUR DARURAT KHUSUS TIM LAPANGAN (USHER/STAFF)
+  // =====================================================================
+  if (userRole === "USHER") {
+      return (
+          <div className="max-w-3xl mx-auto space-y-6 mt-10">
+              <div className="text-center">
+                  <h1 className="text-3xl font-bold text-slate-900">Upload WCC Darurat</h1>
+                  <p className="text-slate-500 mt-2">Pusat unggahan aset acara hari ini. File akan langsung dikirim ke Cloudflare R2.</p>
+              </div>
+              <div className="p-12 bg-amber-50 rounded-xl border-2 border-dashed border-amber-300 text-center flex flex-col items-center justify-center">
+                  <SimpleUploadButton 
+                      destination="wcc" 
+                      path="wcc-live-event" 
+                      label="Pilih & Unggah File WCC"
+                      className="w-full max-w-sm"
+                      onUploadComplete={(url) => {
+                          // File langsung masuk ke bucket R2 tanpa menyentuh database Prisma
+                          alert("File berhasil diunggah ke Storage Utama!");
+                      }}
+                  />
+                  <p className="mt-4 text-xs text-amber-600 font-bold">Pastikan internet stabil saat proses mengunggah.</p>
+              </div>
+          </div>
+      );
+  }
 
-  // 1. Ubah pencarian menggunakan tabel Project
-  const project = await prisma.project.findFirst({
-    where: { userId: targetUserId, isActive: true },
-  });
-
-  if (!project) return <div className="p-8 text-center text-red-500">Data proyek tidak ditemukan.</div>;
-
-  // 2. Ekstrak data JSON untuk Background
-  const themeConfig = (project.themeConfig as any) || {};
-  const initialWings = themeConfig.desktopBackground || null;
-
-  // 3. Ekstrak data JSON untuk Aset Gambar Mempelai & Cover
-  const meta = (project.eventMetadata as any) || {};
-  const coverImageUrl = meta.coverImageUrl || null;
-  const groomImageUrl = meta.groomImageUrl || null;
-  const brideImageUrl = meta.brideImageUrl || null;
-
+  // =====================================================================
+  // JALUR NORMAL UNTUK ADMIN / CLIENT (Akan error di client component jika tidak disesuaikan, 
+  // tapi karena kita fokus ke USHER hari ini, biarkan admin menggunakan dashboard lama dulu)
+  // =====================================================================
+  
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-        <div>
-            <h1 className="text-2xl font-bold text-slate-900">Media & Aset Digital</h1>
-            <p className="text-slate-500">Kelola foto profil, cover utama, background desktop, dan galeri.</p>
-        </div>
-        
-        {/* 4. Ubah invitationId menjadi projectId dan oper variabel JSON yang diekstrak */}
-        <ClientAssetsForm 
-            projectId={project.id}
-            userId={targetUserId}
-            initialCover={coverImageUrl}
-            initialGroom={groomImageUrl} 
-            initialBride={brideImageUrl} 
-            initialWings={initialWings} 
-            initialGallery={project.gallery}
-        />
-    </div>
+      <div className="p-8 text-center text-slate-500">
+          Untuk Admin: Halaman media normal sedang dalam mode Bypass WCC hari ini.
+      </div>
   );
 }

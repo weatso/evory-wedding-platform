@@ -5,8 +5,9 @@ import { Loader2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { getPresignedUploadUrl } from "@/lib/actions/upload"; 
 
+// Ubah bagian ini:
 interface Props {
-  destination: "client" | "system"; // <-- UBAH 'template' MENJADI 'system'
+  destination: "client" | "system" | "wcc"; // <-- PERBAIKAN: Tambahkan "wcc"
   path: string;
   onUploadComplete: (url: string) => void;
   label?: string;
