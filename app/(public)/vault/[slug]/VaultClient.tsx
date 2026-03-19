@@ -260,14 +260,44 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     }
   };
 
+  // ── Fetch all files from API (for Select All download) ──────────────
+  const fetchAllFiles = useCallback(async (): Promise<{ name: string; url: string; type: string; size: string }[]> => {
+    const params = new URLSearchParams({
+      all: "true",
+      type: activeFilter,
+      search: debouncedSearch,
+      sort: sortBy,
+      folder: activeFolder !== "all" ? activeFolder : "",
+    });
+    const res = await fetch(`/api/vault/${encodeURIComponent(eventName)}?${params}`);
+    if (!res.ok) throw new Error("Gagal mengambil daftar file");
+    const data = await res.json();
+    return data.files;
+  }, [eventName, activeFilter, debouncedSearch, sortBy, activeFolder]);
+
   // ── Bulk Download / ZIP ─────────────────────────────────────────────
   const handleBulkDownload = async (format: "individual" | "zip") => {
     if (selectedFiles.size === 0 && !isAllSelected) return alert("Pilih minimal 1 file.");
 
-    const filesToDownload = isAllSelected ? files : Array.from(selectedFiles).map(idx => files[idx]);
+    let filesToDownload: { name: string; url: string; type?: string; size?: string }[];
+
+    // Jika "Pilih Semua" aktif, ambil SEMUA file dari server (bukan hanya yang sudah di-load)
+    if (isAllSelected) {
+      try {
+        setIsZipping(true); // Tampilkan loading saat mengambil daftar
+        filesToDownload = await fetchAllFiles();
+      } catch (error) {
+        console.error("Gagal mengambil semua file:", error);
+        alert("Gagal mengambil daftar file dari server.");
+        setIsZipping(false);
+        return;
+      }
+    } else {
+      filesToDownload = Array.from(selectedFiles).map(idx => files[idx]);
+    }
 
     if (format === "zip") {
-      setIsZipping(true);
+      if (!isAllSelected) setIsZipping(true); // Jika isAllSelected, sudah true dari atas
       try {
         const CHUNK_SIZE = 30; // Batas aman RAM Browser
         const chunks = [];
@@ -309,6 +339,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         setIsAllSelected(false);
       }
     } else {
+      setIsZipping(false); // Reset jika sebelumnya di-set saat fetchAllFiles
       alert(`Memulai pengunduhan ${filesToDownload.length} file. Izinkan popup jika diminta browser.`);
       for (let i = 0; i < filesToDownload.length; i++) {
         const file = filesToDownload[i];
@@ -772,9 +803,11 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       </div>
 
       {/* ══════════ FLOATING BATCH BAR (HANYA JIKA TIDAK ALL SELECTED) ══════════ */}
-      {selectedFiles.size > 0 && !isAllSelected && (
+      {(selectedFiles.size > 0 || isAllSelected) && (
         <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto bg-[#0a3d50]/95 border border-[#E5C185]/20 text-white px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xl shadow-black/40 flex items-center gap-2 sm:gap-4 backdrop-blur-xl">
-          <span className="text-xs sm:text-sm font-bold text-[#E5C185]">{selectedFiles.size}</span>
+          <span className="text-xs sm:text-sm font-bold text-[#E5C185]">
+            {isAllSelected ? `Semua (${stats.total})` : selectedFiles.size}
+          </span>
           <span className="text-xs sm:text-sm text-white/60 hidden sm:inline">file dipilih</span>
           <div className="w-px h-5 bg-white/10" />
 
@@ -788,7 +821,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             {isZipping ? <Loader2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 animate-spin" /> : <Archive className="w-3.5 sm:w-4 h-3.5 sm:h-4" />} ZIP
           </button>
 
-          <button onClick={() => setSelectedFiles(new Set())}
+          <button onClick={() => { setSelectedFiles(new Set()); setIsAllSelected(false); }}
             className="p-1.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0">
             <X className="w-4 h-4" />
           </button>
@@ -835,7 +868,7 @@ function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, o
 
         <button onClick={(e) => { e.stopPropagation(); onSelect(idx); }}
           className={`absolute top-2 left-2 z-10 p-1.5 rounded-lg transition-all duration-200 ${isSelected ? "bg-[#E5C185] text-[#07303F] shadow-lg"
-            : "bg-black/40 text-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+            : "bg-black/40 text-white/70 backdrop-blur-sm sm:opacity-0 sm:group-hover:opacity-100"
             }`}>
           {isSelected ? <Check className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
         </button>
