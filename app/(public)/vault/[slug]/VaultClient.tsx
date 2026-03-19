@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import {
@@ -227,33 +228,52 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const handleBulkDownload = async (format: "individual" | "zip") => {
     if (selectedFiles.size === 0 && !isAllSelected) return alert("Pilih minimal 1 file.");
 
-    if (format === "zip" && (selectedFiles.size > 30 || isAllSelected)) {
-      return alert("Untuk mencegah perangkat crash, ZIP dibatasi maksimal 30 file. Gunakan opsi 'Unduh Satuan'.");
-    }
-
     const filesToDownload = isAllSelected ? files : Array.from(selectedFiles).map(idx => files[idx]);
 
     if (format === "zip") {
       setIsZipping(true);
       try {
-        const zip = new JSZip();
-        const fetchPromises = filesToDownload.map(async (file) => {
-          const response = await fetch(file.url);
-          const blob = await response.blob();
-          zip.file(file.name, blob);
-        });
+        const CHUNK_SIZE = 30; // Batas aman RAM Browser
+        const chunks = [];
+        for (let i = 0; i < filesToDownload.length; i += CHUNK_SIZE) {
+          chunks.push(filesToDownload.slice(i, i + CHUNK_SIZE));
+        }
 
-        await Promise.all(fetchPromises);
-        const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, `${eventName.replace(/-/g, "_")}-collection.zip`);
+        if (chunks.length > 1) {
+          alert(`Sistem mendeteksi volume file besar (${filesToDownload.length} file). Untuk mencegah perangkat Anda mati, sistem akan otomatis membaginya menjadi ${chunks.length} bagian ZIP. Mohon jangan tutup halaman ini sampai semua bagian selesai diunduh.`);
+        }
+
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const zip = new JSZip();
+          
+          const fetchPromises = chunk.map(async (file) => {
+            const response = await fetch(file.url);
+            const blob = await response.blob();
+            zip.file(file.name, blob);
+          });
+
+          await Promise.all(fetchPromises);
+          const content = await zip.generateAsync({ type: "blob" });
+          
+          const partLabel = chunks.length > 1 ? `-Part_${i + 1}` : "";
+          saveAs(content, `${eventName.replace(/-/g, "_")}${partLabel}.zip`);
+          
+          // Jeda pernapasan memori 2 detik antar ZIP agar Safari tidak memblokir spam unduhan
+          if (i < chunks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
       } catch (error) {
         console.error("ZIP Error:", error);
-        alert("Gagal mengompresi file.");
+        alert("Gagal mengompresi file. Pastikan ruang penyimpanan perangkat Anda cukup.");
       } finally {
         setIsZipping(false);
+        setSelectedFiles(new Set());
+        setIsAllSelected(false);
       }
     } else {
-      alert(`Memulai pengunduhan ${filesToDownload.length} file. Izinkan popup jika diminta browser.`);
+      alert(`Memulai pengunduhan ${filesToDownload.length} file secara berurutan. Izinkan popup jika diminta browser.`);
       for (let i = 0; i < filesToDownload.length; i++) {
         const file = filesToDownload[i];
         const link = document.createElement("a");
@@ -263,7 +283,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        await new Promise(resolve => setTimeout(resolve, 800)); // Jeda aman iOS
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
       setSelectedFiles(new Set());
       setIsAllSelected(false);
@@ -385,15 +405,19 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       <div className="relative z-10 max-w-6xl mx-auto pt-8 sm:pt-12 md:pt-20 pb-4 px-4 md:px-6 overflow-hidden">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 sm:w-16 h-12 sm:h-16 rounded-full border border-[#E5C185]/30 flex items-center justify-center bg-[#E5C185]/10 shadow-[0_0_15px_rgba(229,193,133,0.1)] shrink-0">
-                <span className="font-serif italic text-2xl sm:text-3xl text-[#E5C185]">E.</span>
+            
+            {/* Logo Asli Evory */}
+            <div className="w-12 sm:w-20 h-12 sm:h-20 rounded-full border border-[#E5C185]/30 flex items-center justify-center bg-[#07303F] shadow-[0_0_20px_rgba(229,193,133,0.15)] shrink-0 relative overflow-hidden">
+                <Image src="/logo/logo-emblem.png" alt="Evory Logo" fill className="object-contain p-2 sm:p-3" />
             </div>
+
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5C185]/80">Media Vault</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5C185]/80">Evory Media Vault</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl md:text-5xl font-serif italic font-bold break-words leading-tight">
-                <span className="text-[#E5C185]">Evory</span> Collection.
+              {/* Ukuran Judul Dibesarkan Secara Masif */}
+              <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif italic font-bold break-words leading-tight tracking-tight max-w-3xl">
+                {eventName.replace(/-/g, " ")}
               </h1>
             </div>
           </div>
@@ -720,25 +744,18 @@ function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, o
         ? "border-[#E5C185] ring-2 ring-[#E5C185]/30 scale-[0.98]"
         : "border-white/[0.06] hover:border-white/20 hover:shadow-xl hover:shadow-black/20"
       }`}>
-      <div className="aspect-square relative bg-white/[0.03] overflow-hidden" onClick={() => onPreview(idx)}>
+      <div className="aspect-square relative bg-[#07303F] overflow-hidden" onClick={() => onPreview(idx)}>
         <ThumbnailContent file={file} idx={idx} isImageLoaded={isImageLoaded} onImageLoad={onImageLoad} />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 bg-white/10 backdrop-blur-sm rounded-full">
-            <Eye className="w-5 h-5 text-white" />
-          </div>
-        </div>
+        
+        {/* Layer Hover Bersih: Eye Icon dihapus agar tidak bentrok */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 pointer-events-none" />
+        
         <button onClick={(e) => { e.stopPropagation(); onSelect(idx); }}
           className={`absolute top-2 left-2 z-10 p-1.5 rounded-lg transition-all duration-200 ${isSelected ? "bg-[#E5C185] text-[#07303F] shadow-lg"
               : "bg-black/40 text-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100"
             }`}>
           {isSelected ? <Check className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
         </button>
-        <div className="absolute top-2 right-2 z-10">
-          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md backdrop-blur-sm ${file.type === "video" ? "bg-blue-500/30 text-blue-200 border border-blue-400/20"
-              : file.type === "image" ? "bg-pink-500/30 text-pink-200 border border-pink-400/20"
-                : "bg-slate-500/30 text-slate-200 border border-slate-400/20"
-            }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
-        </div>
       </div>
       <div className="p-3 bg-white/[0.02]">
         <p className="text-xs font-medium text-white/80 truncate mb-1.5" title={file.name}>{file.name}</p>
@@ -777,9 +794,21 @@ function ThumbnailContent({ file, idx, isImageLoaded, onImageLoad }: {
   if (file.type === "video") {
     return (
       <div className="relative w-full h-full bg-[#07303F] flex flex-col items-center justify-center group overflow-hidden border border-white/5">
-        <div className="absolute inset-0 opacity-20 bg-gradient-to-tr from-[#07303F] to-[#E5C185] blur-xl group-hover:scale-150 transition-transform duration-700" />
-        <PlayCircle className="w-12 h-12 text-[#E5C185] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all z-10" strokeWidth={1.5} />
-        <span className="absolute bottom-3 right-3 text-[9px] font-bold tracking-widest text-[#E5C185] bg-[#07303F]/80 px-2 py-1 rounded backdrop-blur-sm z-10 border border-[#E5C185]/30">
+        
+        {/* INJEKSI FRAME VIDEO (Detik 0.001) */}
+        <video 
+          src={`${file.url}#t=0.001`} 
+          className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-30 transition-opacity duration-500"
+          preload="metadata"
+          muted
+          playsInline
+        />
+        
+        {/* Lapisan Gradien Gelap: Mencegah ikon Play tertelan latar belakang video yang terang */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#07303F]/90 via-[#07303F]/20 to-transparent pointer-events-none" />
+        
+        <PlayCircle className="w-10 h-10 text-white group-hover:text-[#E5C185] group-hover:scale-110 transition-all drop-shadow-2xl z-10" strokeWidth={1.5} />
+        <span className="absolute bottom-2 right-2 text-[9px] font-bold tracking-widest text-white/90 bg-black/60 px-2 py-1 rounded backdrop-blur-md z-10 border border-white/10">
           VIDEO
         </span>
       </div>
