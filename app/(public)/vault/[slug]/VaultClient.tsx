@@ -431,17 +431,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            {[
-              { icon: <FileImage className="w-3.5 h-3.5" />, label: "Foto", count: stats.images },
-              { icon: <FileVideo className="w-3.5 h-3.5" />, label: "Video", count: stats.videos },
-              { icon: <FileIcon className="w-3.5 h-3.5" />, label: "Dokumen", count: stats.documents },
-            ].map(s => s.count > 0 && (
-              <div key={s.label} className="flex items-center gap-1.5 text-[11px] sm:text-xs text-white/50 bg-white/5 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border border-white/5">
-                {s.icon}<span>{s.count} {s.label}</span>
-              </div>
-            ))}
-          </div>
+          
         </div>
       </div>
 
@@ -645,7 +635,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                 <Virtuoso
                   useWindowScroll
                   totalCount={files.length}
-                  overscan={1000}
+                  overscan={750}
                   endReached={() => {
                     if (hasMore && !isLoadingMore && !isLoading) {
                       const next = currentPage + 1;
@@ -688,7 +678,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               <VirtuosoGrid
                 useWindowScroll
                 totalCount={files.length}
-                overscan={1000}
+                overscan={750}
                 listClassName={gridClasses[gridMode]}
                 itemClassName="flex w-full"
                 endReached={() => {
