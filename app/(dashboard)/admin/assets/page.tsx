@@ -100,8 +100,13 @@ export default function AssetVaultPage() {
     };
 
     // Saat Selesai
-    xhr.onload = () => {
+    xhr.onload = async () => {
       if (xhr.status === 200) {
+        // Hapus cache untuk slug/event ini (ambil folder root)
+        const rootFolder = currentPath.length > 0 ? currentPath[0] : "";
+        if (rootFolder && destination === "wcc") {
+          fetch(`/api/vault/${encodeURIComponent(rootFolder)}`, { method: "DELETE" }).catch(() => {});
+        }
         fetchAssets(); // Refresh tabel file
       } else {
         alert("Gagal mengunggah aset secara langsung ke Cloudflare.");

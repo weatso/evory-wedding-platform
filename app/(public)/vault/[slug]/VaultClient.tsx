@@ -88,7 +88,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<SortType>("name_asc");
   const [gridMode, setGridMode] = useState<GridMode>("grid-lg");
-  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [selectAllMode, setSelectAllMode] = useState<"none" | "project_filtered" | "project_all">("none");
   const [isZipping, setIsZipping] = useState(false);
 
   type FolderType = "all" | "highlight" | "raw";
@@ -197,7 +197,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     setCurrentPage(1);
     setHasMore(true);
     setSelectedFiles(new Set());
-    setIsAllSelected(false);
+    setCopied(false);
+    setSelectAllMode("none");
     setImageLoadStates(new Map());
     fetchPage(1);
   }, [fetchPage]);
@@ -235,8 +236,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 
   // ── Selection helpers ───────────────────────────────────────────────
   const toggleSelect = (idx: number) => {
-    if (isAllSelected) {
-      setIsAllSelected(false);
+    if (selectAllMode !== "none") {
+      setSelectAllMode("none");
       const allLoadedIndices = new Set(files.map((_, i) => i));
       allLoadedIndices.delete(idx);
       setSelectedFiles(allLoadedIndices);
@@ -250,24 +251,24 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   };
 
   const handleSelectAllToggle = () => {
-    if (isAllSelected) {
-      setIsAllSelected(false);
+    if (selectAllMode !== "none") {
+      setSelectAllMode("none");
       setSelectedFiles(new Set());
     } else {
-      setIsAllSelected(true);
+      setSelectAllMode("project_filtered");
       const allLoadedIndices = new Set(files.map((_, i) => i));
       setSelectedFiles(allLoadedIndices);
     }
   };
 
   // ── Fetch all files from API (for Select All download) ──────────────
-  const fetchAllFiles = useCallback(async (): Promise<{ name: string; url: string; type: string; size: string }[]> => {
+  const fetchAllFiles = useCallback(async (ignoreFilters: boolean): Promise<{ name: string; url: string; type: string; size: string }[]> => {
     const params = new URLSearchParams({
       all: "true",
-      type: activeFilter,
-      search: debouncedSearch,
+      type: ignoreFilters ? "all" : activeFilter,
+      search: ignoreFilters ? "" : debouncedSearch,
       sort: sortBy,
-      folder: activeFolder !== "all" ? activeFolder : "",
+      folder: ignoreFilters ? "all" : (activeFolder !== "all" ? activeFolder : ""),
     });
     const res = await fetch(`/api/vault/${encodeURIComponent(eventName)}?${params}`);
     if (!res.ok) throw new Error("Gagal mengambil daftar file");
@@ -277,15 +278,15 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 
   // ── Bulk Download / ZIP ─────────────────────────────────────────────
   const handleBulkDownload = async (format: "individual" | "zip") => {
-    if (selectedFiles.size === 0 && !isAllSelected) return alert("Pilih minimal 1 file.");
+    if (selectedFiles.size === 0 && selectAllMode === "none") return alert("Pilih minimal 1 file.");
 
     let filesToDownload: { name: string; url: string; type?: string; size?: string }[];
 
     // Jika "Pilih Semua" aktif, ambil SEMUA file dari server (bukan hanya yang sudah di-load)
-    if (isAllSelected) {
+    if (selectAllMode !== "none") {
       try {
         setIsZipping(true); // Tampilkan loading saat mengambil daftar
-        filesToDownload = await fetchAllFiles();
+        filesToDownload = await fetchAllFiles(selectAllMode === "project_all");
       } catch (error) {
         console.error("Gagal mengambil semua file:", error);
         alert("Gagal mengambil daftar file dari server.");
@@ -297,7 +298,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     }
 
     if (format === "zip") {
-      if (!isAllSelected) setIsZipping(true); // Jika isAllSelected, sudah true dari atas
+      if (selectAllMode === "none") setIsZipping(true); // Jika selectAllMode !== "none", sudah true dari atas
       try {
         const CHUNK_SIZE = 30; // Batas aman RAM Browser
         const chunks = [];
@@ -336,11 +337,11 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       } finally {
         setIsZipping(false);
         setSelectedFiles(new Set());
-        setIsAllSelected(false);
+        setSelectAllMode("none");
       }
     } else {
       setIsZipping(false); // Reset jika sebelumnya di-set saat fetchAllFiles
-      alert(`Memulai pengunduhan ${filesToDownload.length} file. Izinkan popup jika diminta browser.`);
+      // Remove alert to prevent prompt spam loop
       for (let i = 0; i < filesToDownload.length; i++) {
         const file = filesToDownload[i];
 
@@ -365,7 +366,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         await new Promise(resolve => setTimeout(resolve, 800));
       }
       setSelectedFiles(new Set());
-      setIsAllSelected(false);
+      setSelectAllMode("none");
     }
   };
 
@@ -429,10 +430,6 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               <p className="text-[10px] sm:text-xs text-white/50 mt-0.5">{previewFile.size} • {previewFile.date}</p>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <a href={previewFile.url} download target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors">
-                <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> <span className="hidden sm:inline">Download</span>
-              </a>
               <button onClick={() => setPreviewIndex(null)} className="p-1.5 sm:p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
                 <X className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
@@ -635,21 +632,9 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             {/* Global Actions */}
             <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-none border-white/5 pt-3 sm:pt-0 mt-1 sm:mt-0">
               <label className="flex items-center gap-2 cursor-pointer text-[11px] sm:text-xs text-white/60 hover:text-white transition-colors">
-                <input type="checkbox" checked={isAllSelected || (selectedFiles.size === files.length && files.length > 0)} onChange={handleSelectAllToggle} className="rounded border-white/20 bg-transparent text-[#E5C185] focus:ring-[#E5C185]" />
+                <input type="checkbox" checked={selectAllMode !== "none" || (selectedFiles.size === files.length && files.length > 0)} onChange={handleSelectAllToggle} className="rounded border-white/20 bg-transparent text-[#E5C185] focus:ring-[#E5C185]" />
                 Pilih Semua
               </label>
-
-              {(selectedFiles.size > 0 || isAllSelected) && (
-                <div className="flex items-center gap-1.5 sm:gap-2 border-l border-white/10 pl-3">
-                  <button onClick={() => handleBulkDownload("individual")} className="flex items-center justify-center h-7 sm:h-8 px-2 sm:px-3 bg-transparent border border-white/10 text-white/70 hover:bg-white/5 hover:text-white text-[10px] sm:text-xs rounded-lg transition-colors">
-                    <Download className="w-3 h-3 sm:mr-1.5" /> <span className="hidden sm:inline">Satuan</span>
-                  </button>
-                  <button onClick={() => handleBulkDownload("zip")} disabled={isZipping} className="flex items-center justify-center h-7 sm:h-8 px-2 sm:px-3 bg-[#E5C185] hover:bg-[#E5C185]/80 text-[#07303F] text-[10px] sm:text-xs font-bold transition-colors border-none rounded-lg disabled:opacity-50">
-                    {isZipping ? <Loader2 className="w-3 h-3 sm:mr-1.5 animate-spin" /> : <Archive className="w-3 h-3 sm:mr-1.5" />}
-                    {isZipping ? "Zipping..." : "Unduh ZIP"}
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -726,7 +711,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   }}
                   itemContent={(idx) => {
                     const file = files[idx];
-                    const isSelected = selectedFiles.has(idx) || isAllSelected;
+                    const isSelected = selectedFiles.has(idx) || selectAllMode !== "none";
                     return (
                       <div className="pb-1 sm:pb-2">
                         <div className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_60px_80px_70px] md:grid-cols-[auto_1fr_80px_100px_80px] gap-2 sm:gap-3 md:gap-4 items-center px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl transition-all cursor-pointer ${isSelected ? "bg-[#E5C185]/10 border border-[#E5C185]/30" : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10"
@@ -774,7 +759,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   return (
                     <div className="w-full pb-2 md:pb-3 h-full">
                       <GridCard file={file} idx={idx}
-                        isSelected={selectedFiles.has(idx) || isAllSelected}
+                        isSelected={selectedFiles.has(idx) || selectAllMode !== "none"}
                         isImageLoaded={!!imageLoadStates.get(idx)}
                         onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad}
                         onForceDownload={forceDownload} // Passing fungsi
@@ -802,32 +787,51 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         )}
       </div>
 
-      {/* ══════════ FLOATING BATCH BAR (HANYA JIKA TIDAK ALL SELECTED) ══════════ */}
-      {(selectedFiles.size > 0 || isAllSelected) && (
-        <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto bg-[#0a3d50]/95 border border-[#E5C185]/20 text-white px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xl shadow-black/40 flex items-center gap-2 sm:gap-4 backdrop-blur-xl">
-          <span className="text-xs sm:text-sm font-bold text-[#E5C185]">
-            {isAllSelected ? `Semua (${stats.total})` : selectedFiles.size}
-          </span>
-          <span className="text-xs sm:text-sm text-white/60 hidden sm:inline">file dipilih</span>
-          <div className="w-px h-5 bg-white/10" />
+      {/* ══════════ FLOATING BATCH BAR ══════════ */}
+      {(selectedFiles.size > 0 || selectAllMode !== "none") && (
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto bg-[#0a3d50]/95 border border-[#E5C185]/20 text-white px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xl shadow-black/40 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 backdrop-blur-xl">
+          
+          <div className="flex items-center justify-between w-full sm:w-auto border-b sm:border-b-0 border-white/10 pb-2 sm:pb-0">
+            <span className="text-xs sm:text-sm font-bold text-[#E5C185] whitespace-nowrap">
+              {selectAllMode === "project_all" 
+                ? `Semua (${stats.total}) file di project` 
+                : selectAllMode === "project_filtered"
+                ? `Semua file di filter ini`
+                : `${selectedFiles.size} file`} dipilih
+            </span>
+            <button onClick={() => { setSelectedFiles(new Set()); setSelectAllMode("none"); }} className="p-1 sm:hidden text-white/50 hover:text-white rounded">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-          <button onClick={() => handleBulkDownload("individual")}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-white/20 transition-colors shadow-lg flex-1 sm:flex-initial justify-center">
-            <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> Satuan
-          </button>
+          <div className="flex items-center w-full gap-2 sm:border-l border-white/10 sm:pl-4 justify-between sm:justify-end">
+            {selectAllMode === "project_filtered" && (
+              <button onClick={() => setSelectAllMode("project_all")} className="text-[10px] sm:text-xs text-[#E5C185] hover:text-white font-medium px-2 py-1.5 rounded bg-white/5 whitespace-nowrap hidden sm:inline-block">
+                Pilih semua ({stats.total}) di project
+              </button>
+            )}
 
-          <button onClick={() => handleBulkDownload("zip")} disabled={isZipping}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors shadow-lg shadow-[#E5C185]/20 flex-1 sm:flex-initial justify-center disabled:opacity-50">
-            {isZipping ? <Loader2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 animate-spin" /> : <Archive className="w-3.5 sm:w-4 h-3.5 sm:h-4" />} ZIP
-          </button>
+            <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+              <button onClick={() => handleBulkDownload("individual")}
+                className="flex items-center justify-center h-7 sm:h-9 px-3 sm:px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-colors whitespace-nowrap">
+                <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Satuan</span>
+              </button>
 
-          <button onClick={() => { setSelectedFiles(new Set()); setIsAllSelected(false); }}
-            className="p-1.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0">
-            <X className="w-4 h-4" />
-          </button>
+              <button onClick={() => handleBulkDownload("zip")} disabled={isZipping}
+                className="flex items-center justify-center h-7 sm:h-9 px-3 sm:px-4 bg-[#E5C185] hover:bg-[#d4b074] text-[#07303F] font-bold rounded-lg sm:rounded-xl text-xs sm:text-sm transition-colors disabled:opacity-50 whitespace-nowrap">
+                {isZipping ? <Loader2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 sm:mr-1.5 animate-spin" /> : <Archive className="w-3.5 sm:w-4 h-3.5 sm:h-4 sm:mr-1.5" />}
+                <span className="hidden sm:inline">{isZipping ? "Memproses..." : "ZIP"}</span>
+                <span className="sm:hidden">ZIP</span>
+              </button>
+
+              <button onClick={() => { setSelectedFiles(new Set()); setSelectAllMode("none"); }}
+                className="hidden sm:flex p-1.5 sm:p-2.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg sm:rounded-xl transition-colors shrink-0">
+                <X className="w-4 sm:w-5 h-4 sm:h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
       {/* ══════════ SCROLL TO TOP ══════════ */}
       {showScrollTop && (
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

@@ -208,3 +208,20 @@ export async function GET(
     return NextResponse.json({ error: "Failed to list vault files" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    // Hapus cache memori untuk event ini agar data terbaru langsung terfetct
+    if (listingCache.has(slug)) {
+      listingCache.delete(slug);
+    }
+    
+    return NextResponse.json({ success: true, message: "Cache cleared successfully" });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to clear cache" }, { status: 500 });
+  }
+}
