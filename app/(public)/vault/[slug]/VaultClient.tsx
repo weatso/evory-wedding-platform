@@ -1,13 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 import {
-  Download, FileVideo, FileImage, File as FileIcon,
-  Search, X, ChevronLeft, ChevronRight, Check,
-  Eye, HardDrive, CheckSquare, Square, Play,
-  Loader2, ArrowUp, Grid3X3, LayoutGrid, List,
-  ArrowUpDown, Copy, CheckCheck, Columns3
+  Archive,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
+  CheckCheck,
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Eye,
+  File as FileIcon,
+  FileImage,
+  FileVideo,
+  Grid3X3,
+  HardDrive,
+  LayoutGrid,
+  List,
+  Loader2,
+  PlayCircle,
+  Search,
+  Square,
+  X
 } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Virtuoso, VirtuosoGrid } from "react-virtuoso";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -36,15 +56,15 @@ interface VaultClientProps {
 
 type FilterType = "all" | "image" | "video" | "document";
 type SortType = "name_asc" | "name_desc" | "size_asc" | "size_desc" | "date_desc" | "date_asc" | "type";
-type GridMode = "grid-sm" | "grid-lg" | "masonry" | "list";
+type GridMode = "grid-sm" | "grid-lg" | "list";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Cache
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const apiCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
-function cacheKey(slug: string, type: string, search: string, sort: string, page: number) {
-  return `${slug}:${type}:${search}:${sort}:p${page}`;
+function cacheKey(eventName: string, type: string, search: string, sort: string, page: number) {
+  return `${eventName}:${type}:${search}:${sort}:p${page}`;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -66,7 +86,9 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<SortType>("name_asc");
-  const [gridMode, setGridMode] = useState<GridMode>("list");
+  const [gridMode, setGridMode] = useState<GridMode>("grid-lg");
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
 
   // Selection
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
@@ -86,10 +108,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const [imageLoadStates, setImageLoadStates] = useState<Map<number, boolean>>(new Map());
   const [copied, setCopied] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number; active: boolean } | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
   // ── Fetch ───────────────────────────────────────────────────────────
@@ -140,26 +160,10 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     setCurrentPage(1);
     setHasMore(true);
     setSelectedFiles(new Set());
+    setIsAllSelected(false);
     setImageLoadStates(new Map());
     fetchPage(1);
   }, [fetchPage]);
-
-  // ── Infinite Scroll ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting && hasMore && !isLoadingMore && !isLoading) {
-          const next = currentPage + 1;
-          setCurrentPage(next);
-          fetchPage(next, true);
-        }
-      },
-      { rootMargin: "400px" }
-    );
-    obs.observe(sentinelRef.current);
-    return () => obs.disconnect();
-  }, [hasMore, currentPage, isLoadingMore, isLoading, fetchPage]);
 
   // ── Scroll-to-top ───────────────────────────────────────────────────
   useEffect(() => {
@@ -194,70 +198,75 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 
   // ── Selection helpers ───────────────────────────────────────────────
   const toggleSelect = (idx: number) => {
+    if (isAllSelected) {
+      setIsAllSelected(false);
+      const allLoadedIndices = new Set(files.map((_, i) => i));
+      allLoadedIndices.delete(idx);
+      setSelectedFiles(allLoadedIndices);
+      return;
+    }
     setSelectedFiles(prev => {
       const n = new Set(prev);
       n.has(idx) ? n.delete(idx) : n.add(idx);
       return n;
     });
   };
-  const toggleSelectAll = () => {
-    if (selectedFiles.size === files.length && files.length > 0) setSelectedFiles(new Set());
-    else setSelectedFiles(new Set(files.map((_, i) => i)));
+
+  const handleSelectAllToggle = () => {
+    if (isAllSelected) {
+      setIsAllSelected(false);
+      setSelectedFiles(new Set());
+    } else {
+      setIsAllSelected(true);
+      const allLoadedIndices = new Set(files.map((_, i) => i));
+      setSelectedFiles(allLoadedIndices);
+    }
   };
 
-  // ── Batch Download with Progress ────────────────────────────────────
-  const handleBatchDownload = async () => {
-    const indices = Array.from(selectedFiles);
-    if (indices.length === 0) return;
-    setDownloadProgress({ current: 0, total: indices.length, active: true });
+  // ── Bulk Download / ZIP ─────────────────────────────────────────────
+  const handleBulkDownload = async (format: "individual" | "zip") => {
+    if (selectedFiles.size === 0 && !isAllSelected) return alert("Pilih minimal 1 file.");
 
-    for (let i = 0; i < indices.length; i++) {
-      if (!downloadProgress?.active && i > 0) break; // cancelled
-      const file = files[indices[i]];
-      const a = document.createElement("a");
-      a.href = file.url;
-      a.download = file.name;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setDownloadProgress(prev => prev ? { ...prev, current: i + 1 } : null);
-      if (i < indices.length - 1) await new Promise(r => setTimeout(r, 400));
+    if (format === "zip" && (selectedFiles.size > 30 || isAllSelected)) {
+      return alert("Untuk mencegah perangkat crash, ZIP dibatasi maksimal 30 file. Gunakan opsi 'Unduh Satuan'.");
     }
 
-    setTimeout(() => setDownloadProgress(null), 2000);
-    setSelectedFiles(new Set());
-  };
+    const filesToDownload = isAllSelected ? files : Array.from(selectedFiles).map(idx => files[idx]);
 
-  // ── Download All ────────────────────────────────────────────────────
-  const handleDownloadAll = async () => {
-    try {
-      const params = new URLSearchParams({
-        all: "true", type: activeFilter, search: debouncedSearch, sort: sortBy,
-      });
-      const res = await fetch(`/api/vault/${encodeURIComponent(eventName)}?${params}`);
-      const data = await res.json();
-      const allFiles: { name: string; url: string }[] = data.files;
+    if (format === "zip") {
+      setIsZipping(true);
+      try {
+        const zip = new JSZip();
+        const fetchPromises = filesToDownload.map(async (file) => {
+          const response = await fetch(file.url);
+          const blob = await response.blob();
+          zip.file(file.name, blob);
+        });
 
-      setDownloadProgress({ current: 0, total: allFiles.length, active: true });
-
-      for (let i = 0; i < allFiles.length; i++) {
-        const a = document.createElement("a");
-        a.href = allFiles[i].url;
-        a.download = allFiles[i].name;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setDownloadProgress(prev => prev ? { ...prev, current: i + 1 } : null);
-        if (i < allFiles.length - 1) await new Promise(r => setTimeout(r, 400));
+        await Promise.all(fetchPromises);
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, `${eventName.replace(/-/g, "_")}-collection.zip`);
+      } catch (error) {
+        console.error("ZIP Error:", error);
+        alert("Gagal mengompresi file.");
+      } finally {
+        setIsZipping(false);
       }
-
-      setTimeout(() => setDownloadProgress(null), 2000);
-    } catch {
-      setDownloadProgress(null);
+    } else {
+      alert(`Memulai pengunduhan ${filesToDownload.length} file. Izinkan popup jika diminta browser.`);
+      for (let i = 0; i < filesToDownload.length; i++) {
+        const file = filesToDownload[i];
+        const link = document.createElement("a");
+        link.href = file.url;
+        link.download = file.name;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        await new Promise(resolve => setTimeout(resolve, 800)); // Jeda aman iOS
+      }
+      setSelectedFiles(new Set());
+      setIsAllSelected(false);
     }
   };
 
@@ -297,14 +306,12 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const gridModes: { key: GridMode; icon: React.ReactNode; label: string }[] = [
     { key: "grid-sm", icon: <Grid3X3 className="w-4 h-4" />, label: "Grid Kecil" },
     { key: "grid-lg", icon: <LayoutGrid className="w-4 h-4" />, label: "Grid Besar" },
-    { key: "masonry", icon: <Columns3 className="w-4 h-4" />, label: "Masonry" },
     { key: "list", icon: <List className="w-4 h-4" />, label: "List" },
   ];
 
   const gridClasses: Record<GridMode, string> = {
     "grid-sm": "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3",
     "grid-lg": "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4",
-    masonry: "",
     list: "flex flex-col gap-1.5 sm:gap-2",
   };
 
@@ -314,7 +321,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#07303F] text-[#F9F8F4] selection:bg-[#E5C185] selection:text-[#07303F]">
 
-      {/* ══════════ LIGHTBOX ══════════ */}
+      {/* ══════════ LIGHTBOX (Mempertahankan Player Video Anda) ══════════ */}
       {previewFile && previewIndex !== null && (
         <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col" onClick={() => setPreviewIndex(null)}>
           <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 shrink-0" onClick={e => e.stopPropagation()}>
@@ -368,83 +375,56 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         </div>
       )}
 
-      {/* ══════════ DOWNLOAD PROGRESS MODAL ══════════ */}
-      {downloadProgress && (
-        <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[#0a3d50] border border-[#E5C185]/20 rounded-2xl p-6 w-80 shadow-2xl">
-            <p className="text-sm font-bold text-white mb-3">Downloading Files</p>
-            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-3">
-              <div className="h-full bg-[#E5C185] rounded-full transition-all duration-300"
-                style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/50">
-                {downloadProgress.current} / {downloadProgress.total} file
-              </span>
-              {downloadProgress.current < downloadProgress.total ? (
-                <button onClick={() => setDownloadProgress(null)}
-                  className="text-xs text-red-400 hover:text-red-300 transition-colors">
-                  Batal
-                </button>
-              ) : (
-                <span className="text-xs text-green-400 flex items-center gap-1">
-                  <CheckCheck className="w-3 h-3" /> Selesai
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ══════════ AMBIENT BACKGROUND ══════════ */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-0 right-0 w-[70vw] h-[70vw] bg-[#E5C185]/[0.04] blur-[150px] rounded-full translate-x-1/3 -translate-y-1/3" />
         <div className="absolute bottom-0 left-0 w-[50vw] h-[50vw] bg-[#4AAEC5]/[0.03] blur-[120px] rounded-full -translate-x-1/4 translate-y-1/4" />
       </div>
 
-      {/* ══════════ HEADER ══════════ */}
+      {/* ══════════ HEADER IDENTITAS EVORY ══════════ */}
       <div className="relative z-10 max-w-6xl mx-auto pt-8 sm:pt-12 md:pt-20 pb-4 px-4 md:px-6 overflow-hidden">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 bg-[#E5C185]/10 border border-[#E5C185]/20 rounded-xl">
-            <HardDrive className="w-5 h-5 text-[#E5C185]" />
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5C185]/80">Media Vault</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl md:text-5xl font-serif italic font-bold mb-2 sm:mb-3 break-words">
-          {eventName.replace(/-/g, " ")}
-        </h1>
-        <p className="text-slate-400 max-w-xl text-xs sm:text-sm leading-relaxed">
-          Seluruh aset beresolusi tinggi tersedia di bawah ini. Pilih file untuk preview atau download.
-        </p>
-
-        {/* Stats Pills */}
-        <div className="flex flex-wrap gap-2 sm:gap-3 mt-4 sm:mt-6">
-          {[
-            { icon: <FileImage className="w-3.5 h-3.5" />, label: "Foto", count: stats.images },
-            { icon: <FileVideo className="w-3.5 h-3.5" />, label: "Video", count: stats.videos },
-            { icon: <FileIcon className="w-3.5 h-3.5" />, label: "Dokumen", count: stats.documents },
-          ].map(s => s.count > 0 && (
-            <div key={s.label} className="flex items-center gap-1.5 text-[11px] sm:text-xs text-white/50 bg-white/5 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border border-white/5">
-              {s.icon}<span>{s.count} {s.label}</span>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 sm:w-16 h-12 sm:h-16 rounded-full border border-[#E5C185]/30 flex items-center justify-center bg-[#E5C185]/10 shadow-[0_0_15px_rgba(229,193,133,0.1)] shrink-0">
+                <span className="font-serif italic text-2xl sm:text-3xl text-[#E5C185]">E.</span>
             </div>
-          ))}
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5C185]/80">Media Vault</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl md:text-5xl font-serif italic font-bold break-words leading-tight">
+                <span className="text-[#E5C185]">Evory</span> Collection.
+              </h1>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            {[
+              { icon: <FileImage className="w-3.5 h-3.5" />, label: "Foto", count: stats.images },
+              { icon: <FileVideo className="w-3.5 h-3.5" />, label: "Video", count: stats.videos },
+              { icon: <FileIcon className="w-3.5 h-3.5" />, label: "Dokumen", count: stats.documents },
+            ].map(s => s.count > 0 && (
+              <div key={s.label} className="flex items-center gap-1.5 text-[11px] sm:text-xs text-white/50 bg-white/5 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border border-white/5">
+                {s.icon}<span>{s.count} {s.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* ══════════ COPY LINK BAR ══════════ */}
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 overflow-hidden">
         <div className="flex items-center gap-2 p-2.5 sm:p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl min-w-0">
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-bold shrink-0">Link</span>
+          <span className="text-[10px] text-white/30 uppercase tracking-wider font-bold shrink-0">Project</span>
           <div className="w-px h-4 bg-white/10 shrink-0" />
-          <p className="text-[10px] sm:text-xs text-white/50 truncate flex-1 min-w-0 font-mono">
-            vault/{eventName}
+          <p className="text-[10px] sm:text-xs text-[#E5C185] truncate flex-1 min-w-0 font-bold">
+            {eventName.replace(/-/g, " ")}
           </p>
           <button onClick={copyLink}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all shrink-0 ${
-              copied
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all shrink-0 ${copied
                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
                 : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white"
-            }`}>
+              }`}>
             {copied ? <><CheckCheck className="w-3 h-3" /> Tersalin</> : <><Copy className="w-3 h-3" /> Salin Link</>}
           </button>
         </div>
@@ -453,23 +433,20 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       {/* ══════════ TOOLBAR ══════════ */}
       <div className="relative z-30 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 sm:mb-6 sticky top-0 overflow-hidden">
         <div className="flex flex-col gap-2 sm:gap-3 p-2.5 sm:p-3 md:p-4 bg-[#07303F]/95 backdrop-blur-xl border border-white/[0.06] rounded-xl sm:rounded-2xl shadow-xl shadow-black/20">
-          {/* Row 1: Filters + Search */}
+          
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
-            {/* Filters */}
             <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
               {filterButtons.map(fb => fb.count > 0 && (
                 <button key={fb.key} onClick={() => setActiveFilter(fb.key)}
-                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
-                    activeFilter === fb.key
+                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeFilter === fb.key
                       ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20"
                       : "text-white/50 hover:text-white hover:bg-white/5"
-                  }`}>
+                    }`}>
                   {fb.label} <span className="ml-1 opacity-60">{fb.count}</span>
                 </button>
               ))}
             </div>
 
-            {/* Search */}
             <div className="relative w-full sm:w-48 md:w-52">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
               <input type="text" placeholder="Cari file..." value={searchQuery}
@@ -484,10 +461,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             </div>
           </div>
 
-          {/* Row 2: Sort + Grid Mode + Select + Download All */}
-          <div className="flex items-center justify-between gap-1.5 sm:gap-2 border-t border-white/[0.04] pt-2 sm:pt-3">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* Sort dropdown */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-white/[0.04] pt-3 sm:pt-4 mt-1 sm:mt-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
               <div ref={sortMenuRef} className="relative">
                 <button onClick={() => setShowSortMenu(!showSortMenu)}
                   className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all">
@@ -499,11 +474,10 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                     {sortOptions.map(s => (
                       <button key={s.key}
                         onClick={() => { setSortBy(s.key); setShowSortMenu(false); }}
-                        className={`w-full text-left px-4 py-2 text-xs transition-colors ${
-                          sortBy === s.key
+                        className={`w-full text-left px-4 py-2 text-xs transition-colors ${sortBy === s.key
                             ? "text-[#E5C185] bg-[#E5C185]/10 font-bold"
                             : "text-white/60 hover:text-white hover:bg-white/5"
-                        }`}>
+                          }`}>
                         {s.label}
                       </button>
                     ))}
@@ -511,38 +485,38 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                 )}
               </div>
 
-              {/* Grid mode toggle */}
-              <div className="flex items-center bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+              {/* Grid Mode Toggles */}
+              <div className="flex items-center bg-white/5 border border-white/10 rounded-lg overflow-hidden ml-auto sm:ml-0">
                 {gridModes.map(gm => (
                   <button key={gm.key} onClick={() => setGridMode(gm.key)} title={gm.label}
-                    className={`p-1.5 transition-all ${
-                      gridMode === gm.key
+                    className={`p-1.5 transition-all ${gridMode === gm.key
                         ? "bg-[#E5C185] text-[#07303F]"
                         : "text-white/40 hover:text-white hover:bg-white/5"
-                    }`}>
+                      }`}>
                     {gm.icon}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Select All */}
-              <button onClick={toggleSelectAll}
-                className="p-1 sm:p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
-                title="Pilih semua">
-                {selectedFiles.size === files.length && files.length > 0
-                  ? <CheckSquare className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#E5C185]" />
-                  : <Square className="w-3.5 sm:w-4 h-3.5 sm:h-4" />}
-              </button>
+            {/* Global Actions */}
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-none border-white/5 pt-3 sm:pt-0 mt-1 sm:mt-0">
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] sm:text-xs text-white/60 hover:text-white transition-colors">
+                <input type="checkbox" checked={isAllSelected || (selectedFiles.size === files.length && files.length > 0)} onChange={handleSelectAllToggle} className="rounded border-white/20 bg-transparent text-[#E5C185] focus:ring-[#E5C185]" />
+                Pilih Semua
+              </label>
 
-              {/* Download All */}
-              <button onClick={handleDownloadAll}
-                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-[#E5C185]/10 hover:text-[#E5C185] hover:border-[#E5C185]/30 transition-all"
-                title="Download semua file">
-                <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
-                <span className="hidden sm:inline">Download All</span>
-              </button>
+              {(selectedFiles.size > 0 || isAllSelected) && (
+                <div className="flex items-center gap-1.5 sm:gap-2 border-l border-white/10 pl-3">
+                  <button onClick={() => handleBulkDownload("individual")} className="flex items-center justify-center h-7 sm:h-8 px-2 sm:px-3 bg-transparent border border-white/10 text-white/70 hover:bg-white/5 hover:text-white text-[10px] sm:text-xs rounded-lg transition-colors">
+                    <Download className="w-3 h-3 sm:mr-1.5" /> <span className="hidden sm:inline">Satuan</span>
+                  </button>
+                  <button onClick={() => handleBulkDownload("zip")} disabled={isZipping} className="flex items-center justify-center h-7 sm:h-8 px-2 sm:px-3 bg-[#E5C185] hover:bg-[#E5C185]/80 text-[#07303F] text-[10px] sm:text-xs font-bold transition-colors border-none rounded-lg disabled:opacity-50">
+                    {isZipping ? <Loader2 className="w-3 h-3 sm:mr-1.5 animate-spin" /> : <Archive className="w-3 h-3 sm:mr-1.5" />}
+                    {isZipping ? "Zipping..." : "Unduh ZIP"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -550,10 +524,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 
       {/* ══════════ FILE GRID ══════════ */}
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 pb-24 sm:pb-32">
-        {/* Skeleton */}
         {isLoading && !hasInitialLoad ? (
           gridMode === "list" ? (
-            /* List skeleton */
             <div className="flex flex-col gap-1.5 sm:gap-2">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl border border-white/[0.04] animate-pulse">
@@ -572,8 +544,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               ))}
             </div>
           ) : (
-            /* Grid skeleton */
-            <div className={gridClasses[gridMode === "masonry" ? "grid-lg" : gridMode]}>
+            <div className={gridClasses[gridMode]}>
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="rounded-2xl overflow-hidden border border-white/[0.06] animate-pulse">
                   <div className="aspect-square bg-white/[0.04]" />
@@ -600,10 +571,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
           </div>
         ) : (
           <>
-            {/* 1. LIST VIEW (VIRTUALIZED) */}
             {gridMode === "list" ? (
               <div className="bg-transparent rounded-xl flex flex-col h-full">
-                {/* Header List */}
                 <div className="hidden sm:grid grid-cols-[auto_1fr_60px_80px_70px] md:grid-cols-[auto_1fr_80px_100px_80px] gap-3 md:gap-4 px-3 sm:px-4 py-2 text-[10px] text-white/30 uppercase tracking-wider font-bold border-b border-white/[0.06] mb-1 sm:mb-2">
                   <span className="w-5" />
                   <span>Nama File</span>
@@ -611,8 +580,6 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   <span>Ukuran</span>
                   <span className="text-right">Aksi</span>
                 </div>
-                
-                {/* Mesin Virtuoso List */}
                 <Virtuoso
                   useWindowScroll
                   totalCount={files.length}
@@ -625,11 +592,10 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   }}
                   itemContent={(idx) => {
                     const file = files[idx];
-                    const isSelected = selectedFiles.has(idx);
+                    const isSelected = selectedFiles.has(idx) || isAllSelected;
                     return (
                       <div className="pb-1 sm:pb-2">
-                        <div className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_60px_80px_70px] md:grid-cols-[auto_1fr_80px_100px_80px] gap-2 sm:gap-3 md:gap-4 items-center px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
-                            isSelected ? "bg-[#E5C185]/10 border border-[#E5C185]/30" : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10"
+                        <div className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_60px_80px_70px] md:grid-cols-[auto_1fr_80px_100px_80px] gap-2 sm:gap-3 md:gap-4 items-center px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl transition-all cursor-pointer ${isSelected ? "bg-[#E5C185]/10 border border-[#E5C185]/30" : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10"
                           }`}>
                           <button onClick={(e) => { e.stopPropagation(); toggleSelect(idx); }} className="shrink-0">
                             {isSelected ? <Check className="w-4 h-4 text-[#E5C185]" /> : <Square className="w-4 h-4 text-white/30 group-hover:text-white/50" />}
@@ -638,9 +604,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                             <p className="text-sm text-white/80 truncate font-medium">{file.name}</p>
                             <p className="text-[10px] text-white/30 sm:hidden">{file.type} • {file.size}</p>
                           </div>
-                          <span className={`hidden sm:block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit ${
-                            file.type === "video" ? "bg-blue-500/20 text-blue-300" : file.type === "image" ? "bg-pink-500/20 text-pink-300" : "bg-slate-500/20 text-slate-300"
-                          }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
+                          <span className={`hidden sm:block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit ${file.type === "video" ? "bg-blue-500/20 text-blue-300" : file.type === "image" ? "bg-pink-500/20 text-pink-300" : "bg-slate-500/20 text-slate-300"
+                            }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
                           <span className="hidden sm:block text-xs text-white/40">{file.size}</span>
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => setPreviewIndex(idx)} className="p-1.5 rounded-md text-white/30 hover:text-white hover:bg-white/10 transition-all">
@@ -656,21 +621,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   }}
                 />
               </div>
-            ) : gridMode === "masonry" ? (
-              /* 2. MASONRY VIEW (NON-VIRTUALIZED) 
-                 Catatan Arsitek: Mode Masonry CSS bawaan Tailwind (columns-x) tidak kompatibel dengan 
-                 virtualisasi DOM karena menuntut browser menghitung seluruh tinggi file. Biarkan ini untuk galeri kecil. */
-              <div className="columns-2 sm:columns-2 md:columns-3 lg:columns-4 gap-2 sm:gap-3 md:gap-4">
-                {files.map((file, idx) => (
-                  <MasonryCard key={`${file.name}-${idx}`} file={file} idx={idx}
-                    isSelected={selectedFiles.has(idx)} isImageLoaded={!!imageLoadStates.get(idx)}
-                    onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad} />
-                ))}
-                {/* Manual Observer untuk Infinite Scroll Masonry */}
-                <div ref={sentinelRef} className="h-10 w-full clear-both" /> 
-              </div>
             ) : (
-              /* 3. GRID VIEW (VIRTUALIZED: sm & lg) */
               <VirtuosoGrid
                 useWindowScroll
                 totalCount={files.length}
@@ -688,7 +639,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   return (
                     <div className="w-full pb-2 md:pb-3 h-full">
                       <GridCard file={file} idx={idx}
-                        isSelected={selectedFiles.has(idx)} isImageLoaded={!!imageLoadStates.get(idx)}
+                        isSelected={selectedFiles.has(idx) || isAllSelected} 
+                        isImageLoaded={!!imageLoadStates.get(idx)}
                         onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad} />
                     </div>
                   );
@@ -696,7 +648,6 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               />
             )}
 
-            {/* Indikator Loading Global */}
             <div className="py-8 flex flex-col items-center justify-center">
               {isLoadingMore && (
                 <div className="flex items-center gap-3 text-white/40 text-sm bg-[#07303F] py-2 px-4 rounded-full shadow-lg border border-white/5">
@@ -714,16 +665,23 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         )}
       </div>
 
-      {/* ══════════ FLOATING BATCH BAR ══════════ */}
-      {selectedFiles.size > 0 && (
+      {/* ══════════ FLOATING BATCH BAR (HANYA JIKA TIDAK ALL SELECTED) ══════════ */}
+      {selectedFiles.size > 0 && !isAllSelected && (
         <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto bg-[#0a3d50]/95 border border-[#E5C185]/20 text-white px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xl shadow-black/40 flex items-center gap-2 sm:gap-4 backdrop-blur-xl">
           <span className="text-xs sm:text-sm font-bold text-[#E5C185]">{selectedFiles.size}</span>
           <span className="text-xs sm:text-sm text-white/60 hidden sm:inline">file dipilih</span>
           <div className="w-px h-5 bg-white/10" />
-          <button onClick={handleBatchDownload}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors shadow-lg shadow-[#E5C185]/20 flex-1 sm:flex-initial justify-center">
-            <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> Download {selectedFiles.size > 1 ? `${selectedFiles.size}` : ""}
+          
+          <button onClick={() => handleBulkDownload("individual")}
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-white/20 transition-colors shadow-lg flex-1 sm:flex-initial justify-center">
+            <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> Satuan
           </button>
+          
+          <button onClick={() => handleBulkDownload("zip")} disabled={isZipping}
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors shadow-lg shadow-[#E5C185]/20 flex-1 sm:flex-initial justify-center disabled:opacity-50">
+            {isZipping ? <Loader2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 animate-spin" /> : <Archive className="w-3.5 sm:w-4 h-3.5 sm:h-4" />} ZIP
+          </button>
+
           <button onClick={() => setSelectedFiles(new Set())}
             className="p-1.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0">
             <X className="w-4 h-4" />
@@ -758,34 +716,28 @@ function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, o
   onSelect: (i: number) => void; onPreview: (i: number) => void; onImageLoad: (i: number) => void;
 }) {
   return (
-    <div className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 cursor-pointer ${
-      isSelected
+    <div className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 cursor-pointer ${isSelected
         ? "border-[#E5C185] ring-2 ring-[#E5C185]/30 scale-[0.98]"
         : "border-white/[0.06] hover:border-white/20 hover:shadow-xl hover:shadow-black/20"
-    }`}>
+      }`}>
       <div className="aspect-square relative bg-white/[0.03] overflow-hidden" onClick={() => onPreview(idx)}>
         <ThumbnailContent file={file} idx={idx} isImageLoaded={isImageLoaded} onImageLoad={onImageLoad} />
-        {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 bg-white/10 backdrop-blur-sm rounded-full">
             <Eye className="w-5 h-5 text-white" />
           </div>
         </div>
-        {/* Checkbox */}
         <button onClick={(e) => { e.stopPropagation(); onSelect(idx); }}
-          className={`absolute top-2 left-2 z-10 p-1.5 rounded-lg transition-all duration-200 ${
-            isSelected ? "bg-[#E5C185] text-[#07303F] shadow-lg"
+          className={`absolute top-2 left-2 z-10 p-1.5 rounded-lg transition-all duration-200 ${isSelected ? "bg-[#E5C185] text-[#07303F] shadow-lg"
               : "bg-black/40 text-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100"
-          }`}>
+            }`}>
           {isSelected ? <Check className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
         </button>
-        {/* Type badge */}
         <div className="absolute top-2 right-2 z-10">
-          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md backdrop-blur-sm ${
-            file.type === "video" ? "bg-blue-500/30 text-blue-200 border border-blue-400/20"
+          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md backdrop-blur-sm ${file.type === "video" ? "bg-blue-500/30 text-blue-200 border border-blue-400/20"
               : file.type === "image" ? "bg-pink-500/30 text-pink-200 border border-pink-400/20"
-              : "bg-slate-500/30 text-slate-200 border border-slate-400/20"
-          }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
+                : "bg-slate-500/30 text-slate-200 border border-slate-400/20"
+            }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
         </div>
       </div>
       <div className="p-3 bg-white/[0.02]">
@@ -804,84 +756,11 @@ function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, o
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Masonry Card Component
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function MasonryCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, onImageLoad }: {
-  file: VaultFile; idx: number; isSelected: boolean; isImageLoaded: boolean;
-  onSelect: (i: number) => void; onPreview: (i: number) => void; onImageLoad: (i: number) => void;
-}) {
-  return (
-    <div className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 cursor-pointer mb-3 md:mb-4 break-inside-avoid ${
-      isSelected
-        ? "border-[#E5C185] ring-2 ring-[#E5C185]/30"
-        : "border-white/[0.06] hover:border-white/20 hover:shadow-xl hover:shadow-black/20"
-    }`}>
-      <div className="relative bg-white/[0.03] overflow-hidden" onClick={() => onPreview(idx)}>
-        {file.type === "image" ? (
-          <>
-            {!isImageLoaded && <div className="aspect-[4/3] bg-white/[0.04] animate-pulse" />}
-            <img src={file.url} alt={file.name}
-              className={`w-full object-cover transition-all duration-700 group-hover:scale-105 ${isImageLoaded ? "opacity-100" : "opacity-0 absolute inset-0"}`}
-              loading="lazy" decoding="async"
-              sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
-              onLoad={() => onImageLoad(idx)} />
-          </>
-        ) : (
-          <div className="aspect-[4/3]">
-            <ThumbnailContent file={file} idx={idx} isImageLoaded={isImageLoaded} onImageLoad={onImageLoad} />
-          </div>
-        )}
-        {/* Checkbox */}
-        <button onClick={(e) => { e.stopPropagation(); onSelect(idx); }}
-          className={`absolute top-2 left-2 z-10 p-1.5 rounded-lg transition-all duration-200 ${
-            isSelected ? "bg-[#E5C185] text-[#07303F] shadow-lg"
-              : "bg-black/40 text-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100"
-          }`}>
-          {isSelected ? <Check className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-        </button>
-        {/* Type badge */}
-        <div className="absolute top-2 right-2 z-10">
-          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md backdrop-blur-sm ${
-            file.type === "video" ? "bg-blue-500/30 text-blue-200 border border-blue-400/20"
-              : file.type === "image" ? "bg-pink-500/30 text-pink-200 border border-pink-400/20"
-              : "bg-slate-500/30 text-slate-200 border border-slate-400/20"
-          }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
-        </div>
-      </div>
-      <div className="p-3 bg-white/[0.02]">
-        <p className="text-xs font-medium text-white/80 truncate" title={file.name}>{file.name}</p>
-        <span className="text-[10px] text-white/30">{file.size}</span>
-      </div>
-    </div>
-  );
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Thumbnail Content (shared between Grid and Masonry)
+// Thumbnail Content
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function ThumbnailContent({ file, idx, isImageLoaded, onImageLoad }: {
   file: VaultFile; idx: number; isImageLoaded: boolean; onImageLoad: (i: number) => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Auto-play video when in viewport, pause when out
-  useEffect(() => {
-    if (file.type !== "video" || !videoRef.current) return;
-    const video = videoRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          video.play().catch(() => {});
-        } else {
-          video.pause();
-        }
-      },
-      { rootMargin: "100px" }
-    );
-    observer.observe(video);
-    return () => observer.disconnect();
-  }, [file.type]);
-
   if (file.type === "image") {
     return (
       <>
@@ -897,13 +776,12 @@ function ThumbnailContent({ file, idx, isImageLoaded, onImageLoad }: {
 
   if (file.type === "video") {
     return (
-      <div className="w-full h-full relative bg-gradient-to-br from-slate-800 to-slate-900">
-        <video ref={videoRef} src={file.url} muted loop playsInline preload="metadata"
-          className="w-full h-full object-cover" />
-        {/* Play icon overlay (subtle) */}
-        <div className="absolute bottom-2 right-2 p-1.5 bg-black/50 backdrop-blur-sm rounded-full">
-          <Play className="w-3 h-3 text-white/80 ml-0.5" />
-        </div>
+      <div className="relative w-full h-full bg-[#07303F] flex flex-col items-center justify-center group overflow-hidden border border-white/5">
+        <div className="absolute inset-0 opacity-20 bg-gradient-to-tr from-[#07303F] to-[#E5C185] blur-xl group-hover:scale-150 transition-transform duration-700" />
+        <PlayCircle className="w-12 h-12 text-[#E5C185] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all z-10" strokeWidth={1.5} />
+        <span className="absolute bottom-3 right-3 text-[9px] font-bold tracking-widest text-[#E5C185] bg-[#07303F]/80 px-2 py-1 rounded backdrop-blur-sm z-10 border border-[#E5C185]/30">
+          VIDEO
+        </span>
       </div>
     );
   }
