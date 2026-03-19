@@ -112,9 +112,37 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const [imageLoadStates, setImageLoadStates] = useState<Map<number, boolean>>(new Map());
   const [copied, setCopied] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [isDownloadingSingle, setIsDownloadingSingle] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
   const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // ── Force Download (iOS compatible) ─────────────────────────────────
+  const forceDownload = useCallback(async (url: string, filename: string) => {
+    if (isDownloadingSingle) return; // Cegah spam klik
+    setIsDownloadingSingle(url);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Network error");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Bersihkan memori
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    } catch (error) {
+      console.error("Gagal mode Blob, fallback ke Tab Baru:", error);
+      window.open(url, "_blank");
+    } finally {
+      setIsDownloadingSingle(null);
+    }
+  }, [isDownloadingSingle]);
 
   // ── Fetch ───────────────────────────────────────────────────────────
   const fetchPage = useCallback(async (page: number, append = false) => {
@@ -126,7 +154,6 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     const cached = apiCache.get(key);
 
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      // ... (biarkan kode dalam blok if ini sama seperti sebelumnya) ...
       if (append) setFiles(prev => [...prev, ...cached.data.files]);
       else setFiles(cached.data.files);
       if (cached.data.stats) setStats(cached.data.stats);
@@ -142,10 +169,10 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       const params = new URLSearchParams({
         page: String(page), limit: "24",
         type: activeFilter, search: debouncedSearch, sort: sortBy,
-        folder: activeFolder !== "all" ? activeFolder : "" 
+        folder: activeFolder !== "all" ? activeFolder : ""
       });
       const res = await fetch(`/api/vault/${encodeURIComponent(eventName)}?${params}`);
-      
+
       // ... (biarkan kode fetch sukses sama seperti sebelumnya) ...
       if (!res.ok) throw new Error("fail");
       const data = await res.json();
@@ -255,7 +282,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
           const zip = new JSZip();
-          
+
           const fetchPromises = chunk.map(async (file) => {
             const response = await fetch(file.url);
             const blob = await response.blob();
@@ -264,10 +291,10 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 
           await Promise.all(fetchPromises);
           const content = await zip.generateAsync({ type: "blob" });
-          
+
           const partLabel = chunks.length > 1 ? `-Part_${i + 1}` : "";
           saveAs(content, `${eventName.replace(/-/g, "_")}${partLabel}.zip`);
-          
+
           // Jeda pernapasan memori 2 detik antar ZIP agar Safari tidak memblokir spam unduhan
           if (i < chunks.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -282,16 +309,28 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         setIsAllSelected(false);
       }
     } else {
-      alert(`Memulai pengunduhan ${filesToDownload.length} file secara berurutan. Izinkan popup jika diminta browser.`);
+      alert(`Memulai pengunduhan ${filesToDownload.length} file. Izinkan popup jika diminta browser.`);
       for (let i = 0; i < filesToDownload.length; i++) {
         const file = filesToDownload[i];
-        const link = document.createElement("a");
-        link.href = file.url;
-        link.download = file.name;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+
+        // Gunakan Blob fetching untuk setiap file agar iOS dipaksa mengunduh
+        try {
+          const response = await fetch(file.url);
+          const blob = await response.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = file.name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+        } catch (error) {
+          console.error("Gagal mengunduh", file.name);
+        }
+
+        // Jeda 800ms tetap wajib agar Safari tidak membekukan antrean
         await new Promise(resolve => setTimeout(resolve, 800));
       }
       setSelectedFiles(new Set());
@@ -384,10 +423,22 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                 <div className="flex flex-col items-center gap-4 p-12 bg-white/5 rounded-2xl border border-white/10">
                   <FileIcon className="w-20 h-20 text-white/30" />
                   <p className="text-white/60 text-sm">Preview tidak tersedia</p>
-                  <a href={previewFile.url} download target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-6 py-3 bg-[#E5C185] text-[#07303F] rounded-lg text-sm font-bold hover:bg-[#d4b074] transition-colors">
-                    <Download className="w-4 h-4" /> Download File
-                  </a>
+                  <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  forceDownload(previewFile.url, previewFile.name);
+                }}
+                disabled={isDownloadingSingle === previewFile.url}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors disabled:opacity-50">
+                {isDownloadingSingle === previewFile.url ? (
+                  <Loader2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> 
+                )}
+                <span className="hidden sm:inline">
+                  {isDownloadingSingle === previewFile.url ? "Mengunduh..." : "Download"}
+                </span>
+              </button>
                 </div>
               )}
             </div>
@@ -414,10 +465,10 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       <div className="relative z-10 max-w-6xl mx-auto pt-8 sm:pt-12 md:pt-20 pb-4 px-4 md:px-6 overflow-hidden">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="flex items-center gap-4">
-            
+
             {/* Logo Asli Evory */}
             <div className="w-12 sm:w-20 h-12 sm:h-20 rounded-full border border-[#E5C185]/30 flex items-center justify-center bg-[#07303F] shadow-[0_0_20px_rgba(229,193,133,0.15)] shrink-0 relative overflow-hidden">
-                <Image src="/logo/logo-emblem.png" alt="Evory Logo" fill className="object-contain p-2 sm:p-3" />
+              <Image src="/logo/logo-emblem.png" alt="Evory Logo" fill className="object-contain p-2 sm:p-3" />
             </div>
 
             <div>
@@ -430,8 +481,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               </h1>
             </div>
           </div>
-          
-          
+
+
         </div>
       </div>
 
@@ -445,8 +496,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
           </p>
           <button onClick={copyLink}
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all shrink-0 ${copied
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white"
+              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+              : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white"
               }`}>
             {copied ? <><CheckCheck className="w-3 h-3" /> Tersalin</> : <><Copy className="w-3 h-3" /> Salin Link</>}
           </button>
@@ -464,15 +515,14 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             <button
               key={folder.id}
               onClick={() => setActiveFolder(folder.id as FolderType)}
-              className={`relative flex flex-col items-center justify-center px-6 sm:px-8 py-3 rounded-lg transition-all duration-300 ${
-                activeFolder === folder.id 
-                  ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20" 
+              className={`relative flex flex-col items-center justify-center px-6 sm:px-8 py-3 rounded-lg transition-all duration-300 ${activeFolder === folder.id
+                  ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20"
                   : "text-white/50 hover:text-white hover:bg-white/5"
-              }`}
+                }`}
             >
               {folder.icon}
               <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">{folder.label}</span>
-              
+
               {/* Indikator Titik Aktif */}
               {activeFolder === folder.id && (
                 <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#E5C185] animate-pulse" />
@@ -485,14 +535,14 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       {/* ══════════ TOOLBAR ══════════ */}
       <div className="relative z-30 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 sm:mb-6 sticky top-0 overflow-hidden">
         <div className="flex flex-col gap-2 sm:gap-3 p-2.5 sm:p-3 md:p-4 bg-[#07303F]/95 backdrop-blur-xl border border-white/[0.06] rounded-xl sm:rounded-2xl shadow-xl shadow-black/20">
-          
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
             <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
               {filterButtons.map(fb => fb.count > 0 && (
                 <button key={fb.key} onClick={() => setActiveFilter(fb.key)}
                   className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeFilter === fb.key
-                      ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20"
-                      : "text-white/50 hover:text-white hover:bg-white/5"
+                    ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20"
+                    : "text-white/50 hover:text-white hover:bg-white/5"
                     }`}>
                   {fb.label} <span className="ml-1 opacity-60">{fb.count}</span>
                 </button>
@@ -527,8 +577,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                       <button key={s.key}
                         onClick={() => { setSortBy(s.key); setShowSortMenu(false); }}
                         className={`w-full text-left px-4 py-2 text-xs transition-colors ${sortBy === s.key
-                            ? "text-[#E5C185] bg-[#E5C185]/10 font-bold"
-                            : "text-white/60 hover:text-white hover:bg-white/5"
+                          ? "text-[#E5C185] bg-[#E5C185]/10 font-bold"
+                          : "text-white/60 hover:text-white hover:bg-white/5"
                           }`}>
                         {s.label}
                       </button>
@@ -542,8 +592,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                 {gridModes.map(gm => (
                   <button key={gm.key} onClick={() => setGridMode(gm.key)} title={gm.label}
                     className={`p-1.5 transition-all ${gridMode === gm.key
-                        ? "bg-[#E5C185] text-[#07303F]"
-                        : "text-white/40 hover:text-white hover:bg-white/5"
+                      ? "bg-[#E5C185] text-[#07303F]"
+                      : "text-white/40 hover:text-white hover:bg-white/5"
                       }`}>
                     {gm.icon}
                   </button>
@@ -693,9 +743,11 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                   return (
                     <div className="w-full pb-2 md:pb-3 h-full">
                       <GridCard file={file} idx={idx}
-                        isSelected={selectedFiles.has(idx) || isAllSelected} 
+                        isSelected={selectedFiles.has(idx) || isAllSelected}
                         isImageLoaded={!!imageLoadStates.get(idx)}
-                        onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad} />
+                        onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad}
+                        onForceDownload={forceDownload} // Passing fungsi
+                      />
                     </div>
                   );
                 }}
@@ -725,12 +777,12 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
           <span className="text-xs sm:text-sm font-bold text-[#E5C185]">{selectedFiles.size}</span>
           <span className="text-xs sm:text-sm text-white/60 hidden sm:inline">file dipilih</span>
           <div className="w-px h-5 bg-white/10" />
-          
+
           <button onClick={() => handleBulkDownload("individual")}
             className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-white/20 transition-colors shadow-lg flex-1 sm:flex-initial justify-center">
             <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> Satuan
           </button>
-          
+
           <button onClick={() => handleBulkDownload("zip")} disabled={isZipping}
             className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors shadow-lg shadow-[#E5C185]/20 flex-1 sm:flex-initial justify-center disabled:opacity-50">
             {isZipping ? <Loader2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 animate-spin" /> : <Archive className="w-3.5 sm:w-4 h-3.5 sm:h-4" />} ZIP
@@ -765,24 +817,25 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Grid Card Component
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, onImageLoad }: {
+function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, onImageLoad, onForceDownload }: {
   file: VaultFile; idx: number; isSelected: boolean; isImageLoaded: boolean;
   onSelect: (i: number) => void; onPreview: (i: number) => void; onImageLoad: (i: number) => void;
+  onForceDownload: (url: string, name: string) => void; // Tambahan props
 }) {
   return (
     <div className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 cursor-pointer ${isSelected
-        ? "border-[#E5C185] ring-2 ring-[#E5C185]/30 scale-[0.98]"
-        : "border-white/[0.06] hover:border-white/20 hover:shadow-xl hover:shadow-black/20"
+      ? "border-[#E5C185] ring-2 ring-[#E5C185]/30 scale-[0.98]"
+      : "border-white/[0.06] hover:border-white/20 hover:shadow-xl hover:shadow-black/20"
       }`}>
       <div className="aspect-square relative bg-[#07303F] overflow-hidden" onClick={() => onPreview(idx)}>
         <ThumbnailContent file={file} idx={idx} isImageLoaded={isImageLoaded} onImageLoad={onImageLoad} />
-        
+
         {/* Layer Hover Bersih: Eye Icon dihapus agar tidak bentrok */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 pointer-events-none" />
-        
+
         <button onClick={(e) => { e.stopPropagation(); onSelect(idx); }}
           className={`absolute top-2 left-2 z-10 p-1.5 rounded-lg transition-all duration-200 ${isSelected ? "bg-[#E5C185] text-[#07303F] shadow-lg"
-              : "bg-black/40 text-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+            : "bg-black/40 text-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100"
             }`}>
           {isSelected ? <Check className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
         </button>
@@ -791,11 +844,17 @@ function GridCard({ file, idx, isSelected, isImageLoaded, onSelect, onPreview, o
         <p className="text-xs font-medium text-white/80 truncate mb-1.5" title={file.name}>{file.name}</p>
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-white/30">{file.size}</span>
-          <a href={file.url} download target="_blank" rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              // Jika ini komponen anak, Anda harus mem-passing forceDownload sebagai props, 
+              // ATAU biarkan fungsi forceDownload global di dalam file.
+              // Karena di arsitektur Anda GridCard ada di luar VaultClient, ubah arsitekturnya sedikit:
+              onForceDownload(file.url, file.name);
+            }}
             className="p-1.5 rounded-md text-white/30 hover:text-[#E5C185] hover:bg-[#E5C185]/10 transition-all">
             <Download className="w-3.5 h-3.5" />
-          </a>
+          </button>
         </div>
       </div>
     </div>
@@ -824,19 +883,19 @@ function ThumbnailContent({ file, idx, isImageLoaded, onImageLoad }: {
   if (file.type === "video") {
     return (
       <div className="relative w-full h-full bg-[#07303F] flex flex-col items-center justify-center group overflow-hidden border border-white/5">
-        
+
         {/* INJEKSI FRAME VIDEO (Detik 0.001) */}
-        <video 
-          src={`${file.url}#t=0.001`} 
+        <video
+          src={`${file.url}#t=0.001`}
           className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-30 transition-opacity duration-500"
           preload="metadata"
           muted
           playsInline
         />
-        
+
         {/* Lapisan Gradien Gelap: Mencegah ikon Play tertelan latar belakang video yang terang */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#07303F]/90 via-[#07303F]/20 to-transparent pointer-events-none" />
-        
+
         <PlayCircle className="w-10 h-10 text-white group-hover:text-[#E5C185] group-hover:scale-110 transition-all drop-shadow-2xl z-10" strokeWidth={1.5} />
         <span className="absolute bottom-2 right-2 text-[9px] font-bold tracking-widest text-white/90 bg-black/60 px-2 py-1 rounded backdrop-blur-md z-10 border border-white/10">
           VIDEO
