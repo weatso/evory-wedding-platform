@@ -8,6 +8,7 @@ import {
   Loader2, ArrowUp, Grid3X3, LayoutGrid, List,
   ArrowUpDown, Copy, CheckCheck, Columns3
 } from "lucide-react";
+import { Virtuoso, VirtuosoGrid } from "react-virtuoso";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Types
@@ -577,85 +578,112 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
           </div>
         ) : (
           <>
-            {/* LIST VIEW */}
+            {/* 1. LIST VIEW (VIRTUALIZED) */}
             {gridMode === "list" ? (
-              <div className="flex flex-col gap-2">
-                {/* List header */}
-                <div className="hidden sm:grid grid-cols-[auto_1fr_80px_100px_80px] gap-4 px-4 py-2 text-[10px] text-white/30 uppercase tracking-wider font-bold border-b border-white/[0.06]">
+              <div className="bg-transparent rounded-xl flex flex-col h-full">
+                {/* Header List */}
+                <div className="hidden sm:grid grid-cols-[auto_1fr_80px_100px_80px] gap-4 px-4 py-2 text-[10px] text-white/30 uppercase tracking-wider font-bold border-b border-white/[0.06] mb-2">
                   <span className="w-5" />
                   <span>Nama File</span>
                   <span>Tipe</span>
                   <span>Ukuran</span>
                   <span className="text-right">Aksi</span>
                 </div>
-                {files.map((file, idx) => {
-                  const isSelected = selectedFiles.has(idx);
-                  return (
-                    <div key={`${file.name}-${idx}`}
-                      className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_80px_100px_80px] gap-4 items-center px-4 py-3 rounded-xl transition-all cursor-pointer ${
-                        isSelected
-                          ? "bg-[#E5C185]/10 border border-[#E5C185]/30"
-                          : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10"
-                      }`}>
-                      <button onClick={(e) => { e.stopPropagation(); toggleSelect(idx); }} className="shrink-0">
-                        {isSelected
-                          ? <Check className="w-4 h-4 text-[#E5C185]" />
-                          : <Square className="w-4 h-4 text-white/30 group-hover:text-white/50" />}
-                      </button>
-                      <div className="min-w-0 cursor-pointer" onClick={() => setPreviewIndex(idx)}>
-                        <p className="text-sm text-white/80 truncate font-medium">{file.name}</p>
-                        <p className="text-[10px] text-white/30 sm:hidden">{file.type} • {file.size}</p>
+                
+                {/* Mesin Virtuoso List */}
+                <Virtuoso
+                  useWindowScroll
+                  totalCount={files.length}
+                  endReached={() => {
+                    if (hasMore && !isLoadingMore && !isLoading) {
+                      const next = currentPage + 1;
+                      setCurrentPage(next);
+                      fetchPage(next, true);
+                    }
+                  }}
+                  itemContent={(idx) => {
+                    const file = files[idx];
+                    const isSelected = selectedFiles.has(idx);
+                    return (
+                      <div className="pb-2">
+                        <div className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_80px_100px_80px] gap-4 items-center px-4 py-3 rounded-xl transition-all cursor-pointer ${
+                            isSelected ? "bg-[#E5C185]/10 border border-[#E5C185]/30" : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10"
+                          }`}>
+                          <button onClick={(e) => { e.stopPropagation(); toggleSelect(idx); }} className="shrink-0">
+                            {isSelected ? <Check className="w-4 h-4 text-[#E5C185]" /> : <Square className="w-4 h-4 text-white/30 group-hover:text-white/50" />}
+                          </button>
+                          <div className="min-w-0 cursor-pointer" onClick={() => setPreviewIndex(idx)}>
+                            <p className="text-sm text-white/80 truncate font-medium">{file.name}</p>
+                            <p className="text-[10px] text-white/30 sm:hidden">{file.type} • {file.size}</p>
+                          </div>
+                          <span className={`hidden sm:block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit ${
+                            file.type === "video" ? "bg-blue-500/20 text-blue-300" : file.type === "image" ? "bg-pink-500/20 text-pink-300" : "bg-slate-500/20 text-slate-300"
+                          }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
+                          <span className="hidden sm:block text-xs text-white/40">{file.size}</span>
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => setPreviewIndex(idx)} className="p-1.5 rounded-md text-white/30 hover:text-white hover:bg-white/10 transition-all">
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <a href={file.url} download target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md text-white/30 hover:text-[#E5C185] hover:bg-[#E5C185]/10 transition-all">
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        </div>
                       </div>
-                      <span className={`hidden sm:block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit ${
-                        file.type === "video" ? "bg-blue-500/20 text-blue-300"
-                          : file.type === "image" ? "bg-pink-500/20 text-pink-300"
-                          : "bg-slate-500/20 text-slate-300"
-                      }`}>{file.type === "video" ? "VID" : file.type === "image" ? "IMG" : "DOC"}</span>
-                      <span className="hidden sm:block text-xs text-white/40">{file.size}</span>
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setPreviewIndex(idx)}
-                          className="p-1.5 rounded-md text-white/30 hover:text-white hover:bg-white/10 transition-all">
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <a href={file.url} download target="_blank" rel="noopener noreferrer"
-                          className="p-1.5 rounded-md text-white/30 hover:text-[#E5C185] hover:bg-[#E5C185]/10 transition-all">
-                          <Download className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  }}
+                />
               </div>
             ) : gridMode === "masonry" ? (
-              /* MASONRY VIEW */
+              /* 2. MASONRY VIEW (NON-VIRTUALIZED) 
+                 Catatan Arsitek: Mode Masonry CSS bawaan Tailwind (columns-x) tidak kompatibel dengan 
+                 virtualisasi DOM karena menuntut browser menghitung seluruh tinggi file. Biarkan ini untuk galeri kecil. */
               <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 md:gap-4">
                 {files.map((file, idx) => (
                   <MasonryCard key={`${file.name}-${idx}`} file={file} idx={idx}
                     isSelected={selectedFiles.has(idx)} isImageLoaded={!!imageLoadStates.get(idx)}
                     onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad} />
                 ))}
+                {/* Manual Observer untuk Infinite Scroll Masonry */}
+                <div ref={sentinelRef} className="h-10 w-full clear-both" /> 
               </div>
             ) : (
-              /* GRID VIEW (sm / lg) */
-              <div className={gridClasses[gridMode]}>
-                {files.map((file, idx) => (
-                  <GridCard key={`${file.name}-${idx}`} file={file} idx={idx}
-                    isSelected={selectedFiles.has(idx)} isImageLoaded={!!imageLoadStates.get(idx)}
-                    onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad} />
-                ))}
-              </div>
+              /* 3. GRID VIEW (VIRTUALIZED: sm & lg) */
+              <VirtuosoGrid
+                useWindowScroll
+                totalCount={files.length}
+                listClassName={gridClasses[gridMode]}
+                itemClassName="flex w-full"
+                endReached={() => {
+                  if (hasMore && !isLoadingMore && !isLoading) {
+                    const next = currentPage + 1;
+                    setCurrentPage(next);
+                    fetchPage(next, true);
+                  }
+                }}
+                itemContent={(idx) => {
+                  const file = files[idx];
+                  return (
+                    <div className="w-full pb-2 md:pb-3 h-full">
+                      <GridCard file={file} idx={idx}
+                        isSelected={selectedFiles.has(idx)} isImageLoaded={!!imageLoadStates.get(idx)}
+                        onSelect={toggleSelect} onPreview={setPreviewIndex} onImageLoad={onImageLoad} />
+                    </div>
+                  );
+                }}
+              />
             )}
 
-            {/* Infinite Scroll Sentinel */}
-            <div ref={sentinelRef} className="py-8 flex justify-center">
+            {/* Indikator Loading Global */}
+            <div className="py-8 flex flex-col items-center justify-center">
               {isLoadingMore && (
-                <div className="flex items-center gap-3 text-white/40 text-sm">
+                <div className="flex items-center gap-3 text-white/40 text-sm bg-[#07303F] py-2 px-4 rounded-full shadow-lg border border-white/5">
                   <Loader2 className="w-5 h-5 animate-spin text-[#E5C185]" />
                   <span>Memuat lebih banyak file...</span>
                 </div>
               )}
               {!hasMore && hasInitialLoad && files.length > 0 && (
-                <p className="text-white/20 text-xs uppercase tracking-widest font-bold">
+                <p className="text-white/20 text-xs uppercase tracking-widest font-bold mt-4 border-t border-white/5 pt-4 w-1/2 text-center">
                   Semua file telah dimuat • {files.length} file
                 </p>
               )}
