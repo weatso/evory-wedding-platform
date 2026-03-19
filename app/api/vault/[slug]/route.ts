@@ -21,6 +21,7 @@ interface VaultFileItem {
   date: string;
   dateRaw: string;
   type: VaultFileType;
+  folder: string; // INJEKSI: Atribut baru untuk deteksi sub-folder
 }
 
 // In-memory server-side cache for R2 listings (per slug)
@@ -54,7 +55,19 @@ async function getFullListing(slug: string, bucketName: string, publicUrlBase: s
       if (file.Key === folderPrefix || (file.Size ?? 0) === 0) continue;
 
       const key = file.Key as string;
-      const fileName = key.replace(folderPrefix, "");
+      const relativePath = key.replace(folderPrefix, ""); 
+      
+      // LOGIKA PEMBEDAHAN FOLDER
+      let folder = "root";
+      let fileName = relativePath;
+      
+      // Jika path memiliki '/', berarti ia ada di dalam sub-folder (misal: "highlight/foto.jpg")
+      if (relativePath.includes("/")) {
+        const parts = relativePath.split("/");
+        folder = parts[0].toLowerCase(); // Mengambil nama folder ("highlight" atau "raw")
+        fileName = parts.pop() || relativePath; // Hanya mengambil nama file ("foto.jpg") agar UI rapi
+      }
+
       const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
       const fileType: VaultFileType = isVideo ? "video" : isImage ? "image" : "document";
@@ -78,6 +91,7 @@ async function getFullListing(slug: string, bucketName: string, publicUrlBase: s
           : "",
         dateRaw: file.LastModified ? file.LastModified.toISOString() : "",
         type: fileType,
+        folder: folder, // Simpan identitas folder ke dalam array
       });
     }
 
@@ -133,7 +147,8 @@ export async function GET(
   const typeFilter = searchParams.get("type") || "all";
   const search = searchParams.get("search")?.toLowerCase() || "";
   const sort = searchParams.get("sort") || "name_asc";
-  const all = searchParams.get("all") === "true"; // return all URLs (for batch download)
+  const folderFilter = searchParams.get("folder")?.toLowerCase() || "all"; // TANGKAP PARAMETER FOLDER
+  const all = searchParams.get("all") === "true"; 
 
   const bucketName = process.env.R2_WCC_BUCKET || process.env.R2_CLIENT_BUCKET;
   const publicUrlBase = process.env.R2_WCC_PUBLIC_URL || process.env.R2_CLIENT_PUBLIC_URL;
@@ -145,30 +160,36 @@ export async function GET(
   try {
     const listing = await getFullListing(slug, bucketName, publicUrlBase);
 
-    // Filter
+    // FILTER LOGIC
     let filtered = listing.files;
+    
+    // 1. Eksekusi Filter Folder
+    if (folderFilter !== "all" && folderFilter !== "") {
+      filtered = filtered.filter(f => f.folder === folderFilter);
+    }
+    
+    // 2. Eksekusi Filter Tipe
     if (typeFilter !== "all") {
       filtered = filtered.filter(f => f.type === typeFilter);
     }
+    
+    // 3. Eksekusi Pencarian
     if (search) {
       filtered = filtered.filter(f => f.name.toLowerCase().includes(search));
     }
 
-    // Sort
     filtered = sortFiles(filtered, sort);
 
-    // If requesting all URLs (for batch download)
     if (all) {
       return NextResponse.json({
         files: filtered.map(f => ({ name: f.name, url: f.url, type: f.type, size: f.size })),
-        stats: listing.stats,
+        stats: listing.stats, // Stats tetap menunjukkan total keseluruhan project
         totalFiltered: filtered.length,
       }, {
         headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
       });
     }
 
-    // Paginate
     const startIndex = (page - 1) * limit;
     const pageFiles = filtered.slice(startIndex, startIndex + limit);
     const hasMore = startIndex + limit < filtered.length;

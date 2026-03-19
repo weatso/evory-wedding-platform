@@ -64,8 +64,8 @@ type GridMode = "grid-sm" | "grid-lg" | "list";
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const apiCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
-function cacheKey(eventName: string, type: string, search: string, sort: string, page: number) {
-  return `${eventName}:${type}:${search}:${sort}:p${page}`;
+function cacheKey(eventName: string, type: string, search: string, sort: string, folder: string, page: number) {
+  return `${eventName}:${type}:${search}:${sort}:${folder}:p${page}`;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -90,6 +90,9 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const [gridMode, setGridMode] = useState<GridMode>("grid-lg");
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+
+  type FolderType = "all" | "highlight" | "raw";
+  const [activeFolder, setActiveFolder] = useState<FolderType>("all");
 
   // Selection
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
@@ -118,10 +121,12 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     if (!append) setIsLoading(true);
     else setIsLoadingMore(true);
 
-    const key = cacheKey(eventName, activeFilter, debouncedSearch, sortBy, page);
+    // KUNCI CACHE DIPERBARUI
+    const key = cacheKey(eventName, activeFilter, debouncedSearch, sortBy, activeFolder, page);
     const cached = apiCache.get(key);
 
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      // ... (biarkan kode dalam blok if ini sama seperti sebelumnya) ...
       if (append) setFiles(prev => [...prev, ...cached.data.files]);
       else setFiles(cached.data.files);
       if (cached.data.stats) setStats(cached.data.stats);
@@ -133,11 +138,15 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
     }
 
     try {
+      // PARAMETER FOLDER DIKIRIM KE BACKEND
       const params = new URLSearchParams({
         page: String(page), limit: "24",
         type: activeFilter, search: debouncedSearch, sort: sortBy,
+        folder: activeFolder !== "all" ? activeFolder : "" 
       });
       const res = await fetch(`/api/vault/${encodeURIComponent(eventName)}?${params}`);
+      
+      // ... (biarkan kode fetch sukses sama seperti sebelumnya) ...
       if (!res.ok) throw new Error("fail");
       const data = await res.json();
       apiCache.set(key, { data, timestamp: Date.now() });
@@ -153,7 +162,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       setIsLoadingMore(false);
       setHasInitialLoad(true);
     }
-  }, [eventName, activeFilter, debouncedSearch, sortBy]);
+  }, [eventName, activeFilter, debouncedSearch, sortBy, activeFolder]); // <-- WAJIB ADA 'activeFolder' DI SINI
 
   // Reset on filter/search/sort change
   useEffect(() => {
@@ -454,6 +463,35 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
         </div>
       </div>
 
+      {/* ══════════ FOLDER NAVIGATION (HIGHLIGHT & RAW) ══════════ */}
+      <div className="relative z-20 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 p-1.5 bg-[#07303F]/80 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl w-fit">
+          {[
+            { id: "all", label: "Semua File", icon: <HardDrive className="w-4 h-4 mb-1" /> },
+            { id: "highlight", label: "Highlight", icon: <CheckCheck className="w-4 h-4 mb-1 text-green-400" /> },
+            { id: "raw", label: "Raw Collection", icon: <Archive className="w-4 h-4 mb-1 text-blue-400" /> }
+          ].map((folder) => (
+            <button
+              key={folder.id}
+              onClick={() => setActiveFolder(folder.id as FolderType)}
+              className={`relative flex flex-col items-center justify-center px-6 sm:px-8 py-3 rounded-lg transition-all duration-300 ${
+                activeFolder === folder.id 
+                  ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20" 
+                  : "text-white/50 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {folder.icon}
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">{folder.label}</span>
+              
+              {/* Indikator Titik Aktif */}
+              {activeFolder === folder.id && (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#E5C185] animate-pulse" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ══════════ TOOLBAR ══════════ */}
       <div className="relative z-30 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 sm:mb-6 sticky top-0 overflow-hidden">
         <div className="flex flex-col gap-2 sm:gap-3 p-2.5 sm:p-3 md:p-4 bg-[#07303F]/95 backdrop-blur-xl border border-white/[0.06] rounded-xl sm:rounded-2xl shadow-xl shadow-black/20">
@@ -607,6 +645,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                 <Virtuoso
                   useWindowScroll
                   totalCount={files.length}
+                  overscan={1000}
                   endReached={() => {
                     if (hasMore && !isLoadingMore && !isLoading) {
                       const next = currentPage + 1;
@@ -649,6 +688,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               <VirtuosoGrid
                 useWindowScroll
                 totalCount={files.length}
+                overscan={1000}
                 listClassName={gridClasses[gridMode]}
                 itemClassName="flex w-full"
                 endReached={() => {
