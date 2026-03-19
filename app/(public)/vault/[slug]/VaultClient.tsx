@@ -66,7 +66,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<SortType>("name_asc");
-  const [gridMode, setGridMode] = useState<GridMode>("grid-sm");
+  const [gridMode, setGridMode] = useState<GridMode>("list");
 
   // Selection
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
@@ -302,33 +302,33 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
   ];
 
   const gridClasses: Record<GridMode, string> = {
-    "grid-sm": "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3",
+    "grid-sm": "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3",
     "grid-lg": "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4",
     masonry: "",
-    list: "flex flex-col gap-2",
+    list: "flex flex-col gap-1.5 sm:gap-2",
   };
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // RENDER
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   return (
-    <div className="min-h-screen bg-[#07303F] text-[#F9F8F4] selection:bg-[#E5C185] selection:text-[#07303F]">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#07303F] text-[#F9F8F4] selection:bg-[#E5C185] selection:text-[#07303F]">
 
       {/* ══════════ LIGHTBOX ══════════ */}
       {previewFile && previewIndex !== null && (
         <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col" onClick={() => setPreviewIndex(null)}>
-          <div className="flex items-center justify-between p-4 md:p-6 shrink-0" onClick={e => e.stopPropagation()}>
-            <div className="min-w-0 flex-1 mr-4">
-              <p className="text-sm font-bold text-white truncate">{previewFile.name}</p>
-              <p className="text-xs text-white/50 mt-0.5">{previewFile.size} • {previewFile.date}</p>
+          <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 shrink-0" onClick={e => e.stopPropagation()}>
+            <div className="min-w-0 flex-1 mr-2 sm:mr-4">
+              <p className="text-xs sm:text-sm font-bold text-white truncate">{previewFile.name}</p>
+              <p className="text-[10px] sm:text-xs text-white/50 mt-0.5">{previewFile.size} • {previewFile.date}</p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <a href={previewFile.url} download target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-[#E5C185] text-[#07303F] rounded-lg text-sm font-bold hover:bg-[#d4b074] transition-colors">
-                <Download className="w-4 h-4" /> Download
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors">
+                <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> <span className="hidden sm:inline">Download</span>
               </a>
-              <button onClick={() => setPreviewIndex(null)} className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                <X className="w-5 h-5" />
+              <button onClick={() => setPreviewIndex(null)} className="p-1.5 sm:p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
             </div>
           </div>
@@ -403,28 +403,28 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       </div>
 
       {/* ══════════ HEADER ══════════ */}
-      <div className="relative z-10 max-w-6xl mx-auto pt-12 md:pt-20 pb-4 px-4 md:px-6">
+      <div className="relative z-10 max-w-6xl mx-auto pt-8 sm:pt-12 md:pt-20 pb-4 px-4 md:px-6 overflow-hidden">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2.5 bg-[#E5C185]/10 border border-[#E5C185]/20 rounded-xl">
             <HardDrive className="w-5 h-5 text-[#E5C185]" />
           </div>
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5C185]/80">Media Vault</span>
         </div>
-        <h1 className="text-3xl md:text-5xl font-serif italic font-bold mb-3">
+        <h1 className="text-2xl sm:text-3xl md:text-5xl font-serif italic font-bold mb-2 sm:mb-3 break-words">
           {eventName.replace(/-/g, " ")}
         </h1>
-        <p className="text-slate-400 max-w-xl text-sm leading-relaxed">
+        <p className="text-slate-400 max-w-xl text-xs sm:text-sm leading-relaxed">
           Seluruh aset beresolusi tinggi tersedia di bawah ini. Pilih file untuk preview atau download.
         </p>
 
         {/* Stats Pills */}
-        <div className="flex flex-wrap gap-3 mt-6">
+        <div className="flex flex-wrap gap-2 sm:gap-3 mt-4 sm:mt-6">
           {[
             { icon: <FileImage className="w-3.5 h-3.5" />, label: "Foto", count: stats.images },
             { icon: <FileVideo className="w-3.5 h-3.5" />, label: "Video", count: stats.videos },
             { icon: <FileIcon className="w-3.5 h-3.5" />, label: "Dokumen", count: stats.documents },
           ].map(s => s.count > 0 && (
-            <div key={s.label} className="flex items-center gap-2 text-xs text-white/50 bg-white/5 rounded-full px-3 py-1.5 border border-white/5">
+            <div key={s.label} className="flex items-center gap-1.5 text-[11px] sm:text-xs text-white/50 bg-white/5 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border border-white/5">
               {s.icon}<span>{s.count} {s.label}</span>
             </div>
           ))}
@@ -432,15 +432,15 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       </div>
 
       {/* ══════════ COPY LINK BAR ══════════ */}
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 mb-4">
-        <div className="flex items-center gap-2 p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 overflow-hidden">
+        <div className="flex items-center gap-2 p-2.5 sm:p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl min-w-0">
           <span className="text-[10px] text-white/30 uppercase tracking-wider font-bold shrink-0">Link</span>
           <div className="w-px h-4 bg-white/10 shrink-0" />
-          <p className="text-xs text-white/50 truncate flex-1 font-mono">
+          <p className="text-[10px] sm:text-xs text-white/50 truncate flex-1 min-w-0 font-mono">
             vault/{eventName}
           </p>
           <button onClick={copyLink}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all shrink-0 ${
               copied
                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
                 : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white"
@@ -451,15 +451,15 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       </div>
 
       {/* ══════════ TOOLBAR ══════════ */}
-      <div className="relative z-30 max-w-6xl mx-auto px-4 md:px-6 mb-6 sticky top-0">
-        <div className="flex flex-col gap-3 p-4 bg-[#07303F]/95 backdrop-blur-xl border border-white/[0.06] rounded-2xl shadow-xl shadow-black/20">
+      <div className="relative z-30 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 mb-4 sm:mb-6 sticky top-0 overflow-hidden">
+        <div className="flex flex-col gap-2 sm:gap-3 p-2.5 sm:p-3 md:p-4 bg-[#07303F]/95 backdrop-blur-xl border border-white/[0.06] rounded-xl sm:rounded-2xl shadow-xl shadow-black/20">
           {/* Row 1: Filters + Search */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
             {/* Filters */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
               {filterButtons.map(fb => fb.count > 0 && (
                 <button key={fb.key} onClick={() => setActiveFilter(fb.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
+                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
                     activeFilter === fb.key
                       ? "bg-[#E5C185] text-[#07303F] shadow-lg shadow-[#E5C185]/20"
                       : "text-white/50 hover:text-white hover:bg-white/5"
@@ -470,7 +470,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             </div>
 
             {/* Search */}
-            <div className="relative w-full sm:w-52">
+            <div className="relative w-full sm:w-48 md:w-52">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
               <input type="text" placeholder="Cari file..." value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -485,12 +485,12 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
           </div>
 
           {/* Row 2: Sort + Grid Mode + Select + Download All */}
-          <div className="flex items-center justify-between gap-2 border-t border-white/[0.04] pt-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2 border-t border-white/[0.04] pt-2 sm:pt-3">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Sort dropdown */}
               <div ref={sortMenuRef} className="relative">
                 <button onClick={() => setShowSortMenu(!showSortMenu)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all">
+                  className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all">
                   <ArrowUpDown className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">{sortOptions.find(s => s.key === sortBy)?.label}</span>
                 </button>
@@ -526,21 +526,21 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* Select All */}
               <button onClick={toggleSelectAll}
-                className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+                className="p-1 sm:p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
                 title="Pilih semua">
                 {selectedFiles.size === files.length && files.length > 0
-                  ? <CheckSquare className="w-4 h-4 text-[#E5C185]" />
-                  : <Square className="w-4 h-4" />}
+                  ? <CheckSquare className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#E5C185]" />
+                  : <Square className="w-3.5 sm:w-4 h-3.5 sm:h-4" />}
               </button>
 
               {/* Download All */}
               <button onClick={handleDownloadAll}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-[#E5C185]/10 hover:text-[#E5C185] hover:border-[#E5C185]/30 transition-all"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-[#E5C185]/10 hover:text-[#E5C185] hover:border-[#E5C185]/30 transition-all"
                 title="Download semua file">
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
                 <span className="hidden sm:inline">Download All</span>
               </button>
             </div>
@@ -549,20 +549,42 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
       </div>
 
       {/* ══════════ FILE GRID ══════════ */}
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-6 pb-32">
+      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 md:px-6 pb-24 sm:pb-32">
         {/* Skeleton */}
         {isLoading && !hasInitialLoad ? (
-          <div className={gridClasses[gridMode === "masonry" ? "grid-lg" : gridMode]}>
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="rounded-2xl overflow-hidden border border-white/[0.06] animate-pulse">
-                <div className="aspect-square bg-white/[0.04]" />
-                <div className="p-3 space-y-2">
-                  <div className="h-3 bg-white/[0.06] rounded w-3/4" />
-                  <div className="h-2.5 bg-white/[0.04] rounded w-1/3" />
+          gridMode === "list" ? (
+            /* List skeleton */
+            <div className="flex flex-col gap-1.5 sm:gap-2">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl border border-white/[0.04] animate-pulse">
+                  <div className="w-4 h-4 bg-white/[0.06] rounded shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="h-3.5 bg-white/[0.06] rounded w-3/4" />
+                    <div className="h-2.5 bg-white/[0.04] rounded w-1/3 sm:hidden" />
+                  </div>
+                  <div className="hidden sm:block h-3 bg-white/[0.06] rounded w-12" />
+                  <div className="hidden sm:block h-3 bg-white/[0.04] rounded w-16" />
+                  <div className="flex gap-1">
+                    <div className="w-7 h-7 bg-white/[0.04] rounded-md" />
+                    <div className="w-7 h-7 bg-white/[0.04] rounded-md" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            /* Grid skeleton */
+            <div className={gridClasses[gridMode === "masonry" ? "grid-lg" : gridMode]}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="rounded-2xl overflow-hidden border border-white/[0.06] animate-pulse">
+                  <div className="aspect-square bg-white/[0.04]" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 bg-white/[0.06] rounded w-3/4" />
+                    <div className="h-2.5 bg-white/[0.04] rounded w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : files.length === 0 && hasInitialLoad ? (
           <div className="py-24 flex flex-col items-center text-center">
             <HardDrive className="w-16 h-16 text-white/10 mb-4" />
@@ -582,7 +604,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
             {gridMode === "list" ? (
               <div className="bg-transparent rounded-xl flex flex-col h-full">
                 {/* Header List */}
-                <div className="hidden sm:grid grid-cols-[auto_1fr_80px_100px_80px] gap-4 px-4 py-2 text-[10px] text-white/30 uppercase tracking-wider font-bold border-b border-white/[0.06] mb-2">
+                <div className="hidden sm:grid grid-cols-[auto_1fr_60px_80px_70px] md:grid-cols-[auto_1fr_80px_100px_80px] gap-3 md:gap-4 px-3 sm:px-4 py-2 text-[10px] text-white/30 uppercase tracking-wider font-bold border-b border-white/[0.06] mb-1 sm:mb-2">
                   <span className="w-5" />
                   <span>Nama File</span>
                   <span>Tipe</span>
@@ -605,8 +627,8 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
                     const file = files[idx];
                     const isSelected = selectedFiles.has(idx);
                     return (
-                      <div className="pb-2">
-                        <div className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_80px_100px_80px] gap-4 items-center px-4 py-3 rounded-xl transition-all cursor-pointer ${
+                      <div className="pb-1 sm:pb-2">
+                        <div className={`group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_60px_80px_70px] md:grid-cols-[auto_1fr_80px_100px_80px] gap-2 sm:gap-3 md:gap-4 items-center px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
                             isSelected ? "bg-[#E5C185]/10 border border-[#E5C185]/30" : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10"
                           }`}>
                           <button onClick={(e) => { e.stopPropagation(); toggleSelect(idx); }} className="shrink-0">
@@ -638,7 +660,7 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
               /* 2. MASONRY VIEW (NON-VIRTUALIZED) 
                  Catatan Arsitek: Mode Masonry CSS bawaan Tailwind (columns-x) tidak kompatibel dengan 
                  virtualisasi DOM karena menuntut browser menghitung seluruh tinggi file. Biarkan ini untuk galeri kecil. */
-              <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 md:gap-4">
+              <div className="columns-2 sm:columns-2 md:columns-3 lg:columns-4 gap-2 sm:gap-3 md:gap-4">
                 {files.map((file, idx) => (
                   <MasonryCard key={`${file.name}-${idx}`} file={file} idx={idx}
                     isSelected={selectedFiles.has(idx)} isImageLoaded={!!imageLoadStates.get(idx)}
@@ -694,16 +716,16 @@ export default function VaultClient({ eventName, initialStats }: VaultClientProp
 
       {/* ══════════ FLOATING BATCH BAR ══════════ */}
       {selectedFiles.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0a3d50]/95 border border-[#E5C185]/20 text-white px-5 py-3 rounded-2xl shadow-2xl shadow-black/40 flex items-center gap-4 backdrop-blur-xl">
-          <span className="text-sm font-bold text-[#E5C185]">{selectedFiles.size}</span>
-          <span className="text-sm text-white/60">file dipilih</span>
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto bg-[#0a3d50]/95 border border-[#E5C185]/20 text-white px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xl shadow-black/40 flex items-center gap-2 sm:gap-4 backdrop-blur-xl">
+          <span className="text-xs sm:text-sm font-bold text-[#E5C185]">{selectedFiles.size}</span>
+          <span className="text-xs sm:text-sm text-white/60 hidden sm:inline">file dipilih</span>
           <div className="w-px h-5 bg-white/10" />
           <button onClick={handleBatchDownload}
-            className="flex items-center gap-2 px-4 py-2 bg-[#E5C185] text-[#07303F] rounded-xl text-sm font-bold hover:bg-[#d4b074] transition-colors shadow-lg shadow-[#E5C185]/20">
-            <Download className="w-4 h-4" /> Download {selectedFiles.size > 1 ? `${selectedFiles.size} Files` : "File"}
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E5C185] text-[#07303F] rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold hover:bg-[#d4b074] transition-colors shadow-lg shadow-[#E5C185]/20 flex-1 sm:flex-initial justify-center">
+            <Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> Download {selectedFiles.size > 1 ? `${selectedFiles.size}` : ""}
           </button>
           <button onClick={() => setSelectedFiles(new Set())}
-            className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+            className="p-1.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>
