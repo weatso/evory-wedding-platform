@@ -70,7 +70,7 @@ export default async function WorkspaceLayout({
         karena sidebar harus tahu ia sedang merender menu untuk workspace yang mana. 
       */}
       <AppSidebar 
-        userRole={session.user.systemRole} 
+        systemRole={session.user.systemRole} 
         workspaceSlug={workspaceSlug} 
       />
       
