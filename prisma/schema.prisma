@@ -12,11 +12,18 @@ datasource db {
 // 1. ENUMS (Tipe Data Tetap)
 // ==========================================
 
-enum UserRole {
-  ADMIN
-  PARTNER
-  CLIENT
-  USHER
+// Peran di tingkat Aplikasi Induk (Evory)
+enum SystemRole {
+  SUPERADMIN  // Anda (Pusat). Memiliki akses tak terbatas ke semua entitas.
+  USER        // Semua orang lain (Pemilik Partner, Staf Partner, Klien)
+}
+
+// Peran di dalam sebuah Workspace/Agensi
+enum WorkspaceRole {
+  OWNER       // Pemilik Agensi Partner (Bisa atur tagihan & tambah staf)
+  ADMIN       // Manajer (Bisa buat proyek & atur tamu)
+  STAFF       // Karyawan (Hanya bisa atur tamu)
+  USHER       // Penjaga pintu (Akses sangat terbatas hanya untuk scan QR)
 }
 
 enum PackageTier {
@@ -50,6 +57,40 @@ enum EventType {
 // 2. AUTH MODELS (NextAuth / Auth.js)
 // ==========================================
 
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String   // Misal: "Evory Internal", "Radeva WO", "WCC"
+  slug        String   @unique // Misal: "evory", "radeva", "wcc" (Untuk URL)
+  logo        String?
+  
+  tier        PackageTier @default(ESSENTIAL)
+  isActive    Boolean     @default(true)
+
+  members     WorkspaceMember[]
+  projects    Project[]
+  templates   Template[] // TAMBAHKAN BARIS INI
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  role        WorkspaceRole @default(STAFF)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, workspaceId]) // Satu orang tidak bisa gabung 2x di workspace yang sama
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -57,25 +98,17 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          UserRole  @default(CLIENT)
 
-  partnerId     String?
-  partner       User?     @relation("PartnerToUsers", fields: [partnerId], references: [id])
-  managedUsers  User[]    @relation("PartnerToUsers")
+  systemRole    SystemRole @default(USER) // Pengganti UserRole lama
 
-  companyName   String?   
-  companyLogo   String?   
+// Relasi ke banyak Workspace
+  workspaces    WorkspaceMember[]
 
-  customTemplates Template[] @relation("CustomTemplates")
+  accounts      Account[]
+  sessions      Session[]
 
   checkInsPerformed Guest[] @relation("UsherCheckIns")
   updatesPerformed  Guest[] @relation("UsherUpdates")
-  
-  accounts      Account[]
-  sessions      Session[]
-  
-  // RELASI DIPERBAIKI: Mengarah ke Project, bukan Invitation
-  projects      Project[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -129,6 +162,10 @@ model Project {
   eventType     EventType       @default(WEDDING)
   activeModules ServiceModule[] 
 
+  // KUNCI MULTI-TENANCY: Proyek ini milik Workspace, BUKAN User
+  workspaceId   String
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   packageTier   PackageTier     @default(ESSENTIAL)
   
   templateId    String?
@@ -140,9 +177,6 @@ model Project {
   themeConfig   Json?    
   gallery       String[] 
   
-  userId        String?
-  user          User?           @relation(fields: [userId], references: [id])
-  
   guests        Guest[]
   wishes        Wish[]
 
@@ -150,6 +184,7 @@ model Project {
   updatedAt     DateTime        @updatedAt
 
   @@index([slug])
+  @@index([workspaceId])
 }
 
 model Guest {
@@ -226,8 +261,9 @@ model Template {
   isFeatured  Boolean          @default(false)
   tier        PackageTier      @default(ESSENTIAL)
 
-  ownerId     String?          
-  owner       User?            @relation("CustomTemplates", fields: [ownerId], references: [id])
+  // RELASI KEPEMILIKAN TEMPLATE DIPERBAIKI (Milik Workspace, bukan User)
+  workspaceId String?          
+  workspace   Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // RELASI DIPERBAIKI: Mengarah ke Project
   projects    Project[]

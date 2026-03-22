@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { updateProjectTemplate } from "@/app/(dashboard)/dashboard/actions";
-import { Button } from "@/components/ui/button";
+import { updateProjectTemplate } from "@/app/(dashboard)/workspace/[workspaceSlug]/actions";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Lock, ExternalLink, Loader2, LayoutTemplate } from "lucide-react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { motion, Variants } from "framer-motion";
+import { LayoutTemplate, Lock } from "lucide-react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 const TIER_RANK: Record<string, number> = { ESSENTIAL: 1, PRESTIGE: 2, ROYAL: 3, CUSTOM: 4 };
 
@@ -23,7 +23,7 @@ export default function ClientTemplateGallery({ projectId, currentTemplateId, cl
     setOptimisticTemplateId(templateId);
     startTransition(async () => {
       const res = await updateProjectTemplate(projectId, templateId);
-      if (res.error) { toast.error(res.error); setOptimisticTemplateId(currentTemplateId); } 
+      if (res.error) { toast.error(res.error); setOptimisticTemplateId(currentTemplateId); }
       else toast.success("Desain undangan berhasil diperbarui!");
     });
   };

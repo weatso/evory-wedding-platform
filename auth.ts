@@ -6,6 +6,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google"; 
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { SystemRole } from "@prisma/client"; // INJEKSI TIPE BARU
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -44,4 +45,21 @@ export const {
       },
     }),
   ],
+  // INJEKSI CALLBACK UNTUK MENYIMPAN ROLE KE DALAM SESI
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.systemRole = (user as any).systemRole as SystemRole;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id as string;
+        session.user.systemRole = token.systemRole as SystemRole;
+      }
+      return session;
+    }
+  }
 });
