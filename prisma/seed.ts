@@ -1,82 +1,85 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Mulai Seeding Database...')
+  console.log("Memulai injeksi data fundamental...");
 
-  // 1. Buat Kategori
-  const catJavanese = await prisma.templateCategory.upsert({
-    where: { slug: 'javanese-series' },
+  // Enkripsi password untuk semua akun dummy ini
+  const hashedPassword = await bcrypt.hash("evory2026", 10);
+
+  // =================================================================
+  // 1. PENCIPTAAN SUPERADMIN (PUSAT)
+  // =================================================================
+  const superadmin = await prisma.user.upsert({
+    where: { email: "natanael@evory.id" },
     update: {},
     create: {
-      name: 'Javanese Series',
-      slug: 'javanese-series',
-      description: 'Nuansa keraton klasik dengan sentuhan modern yang elegan.',
+      name: "Natanael Alexander",
+      email: "natanael@evory.id",
+      password: hashedPassword,
+      systemRole: "SUPERADMIN", // OTORITAS TERTINGGI
     },
-  })
+  });
 
-  const catModern = await prisma.templateCategory.upsert({
-    where: { slug: 'modern-minimalist' },
+  // Penciptaan Workspace Khusus Internal Evory
+  const evoryWorkspace = await prisma.workspace.upsert({
+    where: { slug: "evory" },
     update: {},
     create: {
-      name: 'Modern Minimalist',
-      slug: 'modern-minimalist',
-      description: 'Desain bersih, tipografi tegas, dan ruang putih yang lega.',
+      name: "Evory Internal",
+      slug: "evory",
+      tier: "CUSTOM",
+      members: {
+        create: {
+          userId: superadmin.id,
+          role: "OWNER"
+        }
+      }
     },
-  })
+  });
 
-  // 2. Buat Template Contoh (Javanese)
-  await prisma.template.upsert({
-    where: { slug: 'jvn-royal-01' },
+  // =================================================================
+  // 2. PENCIPTAAN PARTNER UJI COBA (TENANT)
+  // =================================================================
+  const partnerUser = await prisma.user.upsert({
+    where: { email: "partner@radeva.com" },
     update: {},
     create: {
-      name: 'Royal Heritage',
-      slug: 'jvn-royal-01',
-      thumbnail: 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2070&auto=format&fit=crop', 
-      previewUrl: 'https://evory-jvn01.vercel.app',
-      categoryId: catJavanese.id,
-      isActive: true, // PERBAIKAN: Menggunakan isActive sesuai schema
-      description: 'Desain eksklusif untuk pernikahan adat Jawa dengan ornamen batik parang.',
+      name: "Budi Radeva",
+      email: "partner@radeva.com",
+      password: hashedPassword,
+      systemRole: "USER", // PENGGUNA BIASA DI MATA SISTEM
     },
-  })
+  });
 
-  await prisma.template.upsert({
-    where: { slug: 'jvn-classic-02' },
+  const partnerWorkspace = await prisma.workspace.upsert({
+    where: { slug: "radeva-wo" },
     update: {},
     create: {
-      name: 'Classic Joglo',
-      slug: 'jvn-classic-02',
-      thumbnail: 'https://images.unsplash.com/photo-1546549095-2c262cb5271d?q=80&w=1925&auto=format&fit=crop',
-      previewUrl: 'https://evory-jvn02.vercel.app',
-      categoryId: catJavanese.id,
-      isActive: true, // PERBAIKAN
+      name: "Radeva Wedding Organizer",
+      slug: "radeva-wo",
+      tier: "PRESTIGE",
+      members: {
+        create: {
+          userId: partnerUser.id,
+          role: "OWNER" // TETAPI DIA ADALAH RAJA DI WORKSPACE-NYA SENDIRI
+        }
+      }
     },
-  })
+  });
 
-  // 3. Buat Template Contoh (Modern)
-  await prisma.template.upsert({
-    where: { slug: 'mdn-clean-01' },
-    update: {},
-    create: {
-      name: 'Clean White',
-      slug: 'mdn-clean-01',
-      thumbnail: 'https://images.unsplash.com/photo-1522673607200-1645062cd495?q=80&w=2070&auto=format&fit=crop',
-      previewUrl: 'https://evory-mdn01.vercel.app',
-      categoryId: catModern.id,
-      isActive: true, // PERBAIKAN
-    },
-  })
-
-  console.log('✅ Seeding Selesai!')
+  console.log("Injeksi selesai. Status:");
+  console.log(`- Superadmin: ${superadmin.email} (Pass: evory2026)`);
+  console.log(`- Partner: ${partnerUser.email} (Pass: evory2026)`);
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect()
+  .catch((e) => {
+    console.error("Gagal melakukan seeding:", e);
+    process.exit(1);
   })
-  .catch(async (e) => {
-    console.error(e)
-    await prisma.$disconnect()
-    process.exit(1)
-  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
