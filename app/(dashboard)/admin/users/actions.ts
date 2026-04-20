@@ -1,40 +1,65 @@
 "use server";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
-import { hash } from "bcryptjs";
+import { prisma } from "@/lib/prisma"; // Pastikan path ini sesuai
 import { revalidatePath } from "next/cache";
 
-export type ActionState = {
-  errors?: string;
-  success?: boolean;
-};
-
-export async function addUserAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function assignWorkspaceToUser(formData: FormData) {
   const session = await auth();
   if (session?.user?.systemRole !== "SUPERADMIN") {
-    return { errors: "Unauthorized" };
+    return { error: "Otoritas ditolak. Hanya Superadmin yang bisa menciptakan Agensi." };
   }
 
-  try {
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const existing = await prisma.user.findUnique({ where: { email } });
-    
-    if (existing) return { errors: "Email sudah dipakai." };
+  const email = formData.get("email") as string;
+  const agencyName = formData.get("agencyName") as string;
 
-    await prisma.user.create({
-      data: {
-        name: formData.get("name") as string,
-        email: email,
-        password: await hash(password, 10),
-        systemRole: (formData.get("role") as string) === "ADMIN" ? "SUPERADMIN" : "USER",
-      },
+  if (!email || !agencyName) return { error: "Email dan Nama Agensi wajib diisi." };
+
+  try {
+    // 1. Cari Target User
+    const targetUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+
+    if (!targetUser) {
+      return { error: "Pengguna dengan email tersebut tidak ditemukan di sistem. Minta mereka mendaftar/login terlebih dahulu." };
+    }
+
+    // 2. Buat Slug Agensi yang Aman
+    let baseSlug = agencyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const existingWorkspace = await prisma.workspace.findUnique({ where: { slug: baseSlug } });
+    if (existingWorkspace) {
+      baseSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    // 3. Transaksi Penciptaan (Mencegah data setengah jadi)
+    await prisma.$transaction(async (tx) => {
+      // Ciptakan Workspace
+      const newWorkspace = await tx.workspace.create({
+        data: {
+          name: agencyName,
+          slug: baseSlug,
+          tier: "ESSENTIAL",
+          isActive: true,
+        }
+      });
+
+      // Ikat User menjadi OWNER
+      await tx.workspaceMember.create({
+        data: {
+          userId: targetUser.id,
+          workspaceId: newWorkspace.id,
+          role: "OWNER"
+        }
+      });
     });
 
     revalidatePath("/admin/users");
-    return { success: true };
+    revalidatePath("/dashboard");
+    return { success: true, message: `Agensi ${agencyName} berhasil diciptakan untuk ${email}.` };
+
   } catch (error) {
-    return { errors: "Gagal menyimpan user." };
+    console.error("Gagal membuat agensi:", error);
+    return { error: "Terjadi kesalahan internal server." };
   }
 }

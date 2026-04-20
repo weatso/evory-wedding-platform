@@ -1,57 +1,74 @@
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db"; // Ganti menjadi "@/lib/prisma" jika Anda menggunakan file itu
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { Clock, XCircle, ShieldAlert } from "lucide-react";
 
-export default async function DashboardGateway() {
+export default async function DashboardTrafficController() {
   const session = await auth();
-  
-  // Jika tidak ada sesi, tendang kembali ke login
   if (!session?.user) redirect("/login");
 
-  // 1. JALUR SUPERADMIN (Pusat)
-  if (session.user.systemRole === "SUPERADMIN") {
+  const userRole = session.user.systemRole;
+
+  // 1. KASTA GLOBAL: SUPERADMIN
+  if (userRole === "SUPERADMIN") {
     redirect("/admin");
   }
 
-  // 2. JALUR PARTNER / STAF (Cari kavling mereka)
+  // 2. KASTA AGENSI: PARTNER & STAF (Cari Kavling Mereka)
   const memberships = await prisma.workspaceMember.findMany({
     where: { userId: session.user.id },
     include: { workspace: true }
   });
 
-  // 3. JIKA TIDAK PUNYA WORKSPACE (Akun mengambang)
-  if (memberships.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#07303F] text-[#F9F8F4] p-4">
-        <div className="text-center space-y-4 max-w-md">
-          <h1 className="text-3xl font-serif text-[#E5C185]">Akses Ditolak</h1>
-          <p className="text-white/60 text-sm leading-relaxed">
-            Akun Anda valid, tetapi belum terikat pada Workspace/Agensi manapun di dalam ekosistem Evory.
-          </p>
-          <p className="text-xs text-white/40 border-t border-white/10 pt-4 mt-4">
-            Silakan hubungi Pusat untuk meminta penugasan Workspace.
-          </p>
-        </div>
-      </div>
-    );
+  if (memberships.length > 0) {
+    // Jika mereka punya kavling, langsung lempar ke Lobi Agensi mereka
+    // (Jika suatu saat 1 orang punya banyak agensi, kita bisa buatkan halaman pemilih. Untuk sekarang, lempar ke yang pertama).
+    redirect(`/workspace/${memberships[0].workspace.slug}`);
   }
 
-  // 4. JIKA PUNYA WORKSPACE
-  // Ambil workspace pertama sebagai default. 
-  // (Jika kelak 1 user bisa punya banyak agensi, kita ubah halaman ini menjadi UI "Pilih Workspace")
-  const defaultWorkspace = memberships[0].workspace;
-  
-  if (!defaultWorkspace.isActive) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#07303F] text-[#F9F8F4]">
-        <div className="text-center">
-          <h1 className="text-2xl font-serif mb-2 text-red-400">Workspace Dibekukan</h1>
-          <p className="text-white/60 text-sm">Agensi Anda saat ini dinonaktifkan oleh sistem pusat.</p>
-        </div>
-      </div>
-    );
+  // 3. KASTA TAK BERTUAN: Pelamar yang belum disetujui
+  const application = await prisma.partnerApplication.findUnique({
+    where: { userId: session.user.id }
+  });
+
+  if (application) {
+     if (application.status === "PENDING") {
+         return (
+           <div className="min-h-[80vh] flex items-center justify-center">
+             <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-sm text-center max-w-md w-full">
+               <Clock className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+               <h1 className="text-2xl font-serif text-[#07303F] mb-2">Aplikasi Sedang Ditinjau</h1>
+               <p className="text-slate-500 text-sm leading-relaxed">
+                 Akun Anda sedang dalam proses peninjauan oleh Evory Pusat. Anda akan otomatis dialihkan ke Workspace Anda setelah aplikasi ini disetujui.
+               </p>
+             </div>
+           </div>
+         );
+     } else if (application.status === "REJECTED") {
+         return (
+           <div className="min-h-[80vh] flex items-center justify-center">
+             <div className="bg-white border border-red-100 p-8 rounded-2xl shadow-sm text-center max-w-md w-full">
+               <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+               <h1 className="text-2xl font-serif text-red-600 mb-2">Aplikasi Ditolak</h1>
+               <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                 {application.notes || "Mohon maaf, agensi Anda belum memenuhi kriteria kemitraan kami saat ini."}
+               </p>
+             </div>
+           </div>
+         );
+     }
   }
 
-  // Lempar otomatis ke Dashboard Workspace mereka
-  redirect(`/workspace/${defaultWorkspace.slug}`);
+  // 4. ANOMALI (User tanpa aplikasi dan tanpa workspace)
+  return (
+     <div className="min-h-[80vh] flex items-center justify-center">
+         <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-sm text-center max-w-md w-full">
+            <ShieldAlert className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-[#07303F] mb-2">Akses Terbatas</h1>
+            <p className="text-slate-500 text-sm">
+              Sistem tidak menemukan otoritas akses untuk akun Anda. Silakan hubungi Administrator.
+            </p>
+         </div>
+     </div>
+  );
 }

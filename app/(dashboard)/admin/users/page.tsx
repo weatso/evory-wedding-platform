@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import AddStaffModal from "../_components/AddStaffModal"; // Sesuaikan path ini jika komponennya ada di tempat lain
+import AssignAgencyModal from "../_components/AssignAgencyModal"; // Pastikan import di paling atas file
 
 export default async function AdminUsersPage() {
     const session = await auth();
@@ -29,6 +30,14 @@ export default async function AdminUsersPage() {
                 </div>
                 {/* Asumsikan Anda memiliki komponen modal untuk tambah staff/klien cepat */}
                 <AddStaffModal roleOptions={["ADMIN", "PARTNER", "USHER"]} /> 
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-serif italic font-bold text-[#07303F]">Manajemen Klien & Tim</h1>
+                    <p className="text-slate-500 text-sm mt-1">Pantau seluruh pengguna dalam ekosistem Evory.</p>
+                </div>
+                <AssignAgencyModal />
             </div>
 
             <Card className="border-slate-200 shadow-sm overflow-hidden">
