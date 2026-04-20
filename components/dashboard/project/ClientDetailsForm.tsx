@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateClientDetails } from "./actions";
+import { updateClientDetails } from "@/app/(dashboard)/workspace/[workspaceSlug]/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -22,7 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { deleteGuest, updateGuest } from "./actions";
+import { deleteGuest, updateGuest } from "@/app/(dashboard)/workspace/[workspaceSlug]/actions";
 
 export interface GuestData {
     id: string;

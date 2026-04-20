@@ -18,7 +18,9 @@ export default async function LiveDashboard({ searchParams }: { searchParams: { 
     if (!eventId) {
         const activeEvent = await prisma.project.findFirst({
             where: {
-                userId: session.user.id,
+                workspace: {
+                    members: { some: { userId: session.user.id } }
+                },
                 isActive: true
             },
             select: { id: true }

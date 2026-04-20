@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Save, UserPlus } from "lucide-react";
 import { useRef, useState } from "react";
-import { addGuest } from "./actions"; // Import Server Action
+import { addGuest } from "@/app/(dashboard)/workspace/[workspaceSlug]/actions";
 
 export default function GuestForm({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(false);

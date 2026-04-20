@@ -17,16 +17,14 @@ export async function authenticate(
     // 1. Cek User & Role di Database dulu
     const user = await prisma.user.findUnique({
         where: { email },
-        select: { role: true }
+        select: { systemRole: true }
     });
 
     // 2. Tentukan Tujuan (Redirect) berdasarkan Role
     let destination = "/dashboard"; // Default untuk CLIENT
 
-    if (user?.role === "ADMIN") {
+    if (user?.systemRole === "SUPERADMIN") {
         destination = "/admin";
-    } else if (user?.role === "USHER") {
-        destination = "/usher"; // <-- Usher langsung ke sini
     }
 
     // 3. Login dengan tujuan yang sudah ditentukan

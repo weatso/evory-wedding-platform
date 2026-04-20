@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Star, Trash2, User, Heart, Image as ImageIcon, Monitor } from "lucide-react";
 import SimpleUploadButton from "@/components/dashboard/SimpleUploadButton";
-import { updateProjectImage, addToGallery, removeFromGallery } from "./media/actions";
+import { updateProjectImage, addToGallery, removeFromGallery } from "@/app/(dashboard)/workspace/[workspaceSlug]/project/[projectSlug]/media/actions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 

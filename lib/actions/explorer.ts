@@ -35,7 +35,7 @@ function formatBytes(bytes: number, decimals = 1) {
 // 1. LIST FILES (BACA DIREKTORI)
 export async function listR2Files(destination: R2Destination, folderPrefix: string = "") {
   const session = await auth();
-  if (!session || !session.user || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || !session.user || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName, publicUrlBase } = getBucketConfig(destination);
   if (!bucketName || !publicUrlBase) return { success: false, error: "Konfigurasi Bucket R2 tidak valid." };
@@ -83,7 +83,7 @@ export async function listR2Files(destination: R2Destination, folderPrefix: stri
 // 2. CREATE FOLDER
 export async function createR2Folder(destination: R2Destination, currentPath: string, folderName: string) {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
@@ -105,7 +105,7 @@ export async function createR2Folder(destination: R2Destination, currentPath: st
 // 3. UPLOAD FILE
 export async function uploadR2File(destination: R2Destination, currentPath: string, formData: FormData) {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName } = getBucketConfig(destination);
   const file = formData.get("file") as File;
@@ -128,7 +128,7 @@ export async function uploadR2File(destination: R2Destination, currentPath: stri
 // 4. DELETE OBJECT
 export async function deleteR2Object(destination: R2Destination, key: string) {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
@@ -144,7 +144,7 @@ export async function deleteR2Object(destination: R2Destination, key: string) {
 // 5. RENAME FILE
 export async function renameR2File(destination: R2Destination, oldKey: string, newFileName: string) {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
@@ -170,7 +170,7 @@ export async function renameR2File(destination: R2Destination, oldKey: string, n
 // 6. LIST ALL FOLDERS (UNTUK MODAL PINDAH FILE)
 export async function listR2Folders(destination: R2Destination, prefix: string = ""): Promise<string[]> {
   const session = await auth();
-  if (!session || !session.user || session.user.role !== "ADMIN") return [];
+  if (!session || !session.user || session.user.systemRole !== "SUPERADMIN") return [];
 
   const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return [];
@@ -203,7 +203,7 @@ export async function listR2Folders(destination: R2Destination, prefix: string =
 // 7. MOVE FILE (PINDAH FILE KE FOLDER LAIN)
 export async function moveR2File(destination: R2Destination, sourceKey: string, targetFolder: string) {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };
@@ -240,7 +240,7 @@ export async function moveR2File(destination: R2Destination, sourceKey: string, 
 // 8. GENERATE PRE-SIGNED URL (DIRECT UPLOAD)
 export async function generatePresignedUrl(destination: R2Destination, currentPath: string, fileName: string, contentType: string) {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+  if (!session || session.user.systemRole !== "SUPERADMIN") return { success: false, error: "Unauthorized" };
 
   const { bucketName } = getBucketConfig(destination);
   if (!bucketName) return { success: false, error: "Bucket tidak dikonfigurasi." };

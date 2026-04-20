@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Trash2, Loader2, AlertTriangle } from "lucide-react";
-import { deleteWish } from "./actions";
+import { deleteWish } from "@/app/(dashboard)/workspace/[workspaceSlug]/actions";
 import { toast } from "sonner"; 
 import { Button } from "@/components/ui/button";
 import {

@@ -34,7 +34,7 @@ const CategorySchema = z.object({
 
 export async function createTemplate(formData: FormData) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  if (session?.user?.systemRole !== "SUPERADMIN") {
     return { error: "Unauthorized Access" };
   }
 
@@ -119,7 +119,7 @@ export async function createTemplate(formData: FormData) {
 
 export async function deleteTemplate(id: string) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };
 
   try {
     await prisma.template.delete({ where: { id } });
@@ -138,7 +138,7 @@ export async function deleteTemplate(id: string) {
 
 export async function createCategory(formData: FormData) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };
 
   const rawData = {
     name: formData.get("name"),
@@ -167,7 +167,7 @@ export async function createCategory(formData: FormData) {
 
 export async function deleteCategory(id: string) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };
 
   try {
     await prisma.templateCategory.delete({ where: { id } });

@@ -7,7 +7,7 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  const userRole = (req.auth?.user as any)?.role;
+  const userRole = (req.auth?.user as any)?.systemRole;
 
   // 1. Definisikan Route
   const isAdminRoute = nextUrl.pathname.startsWith("/admin");

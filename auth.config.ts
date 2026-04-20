@@ -5,18 +5,14 @@ export const authConfig = {
     signIn: "/login",
     error: "/login",
   },
-  // Providers dikosongkan di sini, karena bcrypt/Prisma tidak bisa masuk Edge.
-  // Kita injeksikan mereka nanti di auth.ts
   providers: [], 
   callbacks: {
-    // Kita pindahkan logic otorisasi rute sepenuhnya ke middleware.ts 
-    // agar file ini hanya mengurus manipulasi Token JWT.
     authorized({ auth }) {
       return true; 
     },
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role; 
+        token.systemRole = (user as any).systemRole; // PERBAIKAN: Gunakan systemRole
         token.id = user.id;
       }
       return token;
@@ -24,7 +20,7 @@ export const authConfig = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as any;
+        session.user.systemRole = token.systemRole as any; // PERBAIKAN: Gunakan systemRole
       }
       return session;
     },

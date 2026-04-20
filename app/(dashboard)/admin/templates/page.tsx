@@ -9,7 +9,7 @@ import Image from "next/image";
 
 export default async function TemplateRegistryPage() {
   const session = await auth();
-  if (!session || session.user.role !== "ADMIN") redirect("/dashboard");
+  if (!session || session.user.systemRole !== "SUPERADMIN") redirect("/dashboard");
 
   // Ambil data secara paralel untuk performa maksimal
   const [templates, categories] = await Promise.all([

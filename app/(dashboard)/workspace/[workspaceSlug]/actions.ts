@@ -233,3 +233,64 @@ export async function deleteWish(wishId: string) {
     return { error: "Gagal menghapus ucapan." };
   }
 }
+
+// ============================================================================
+// PROJECT CREATION ACTIONS
+// ============================================================================
+
+export async function createWorkspaceProject(workspaceSlug: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user) return { error: "Sesi tidak valid. Silakan login kembali." };
+
+  const title = formData.get("title") as string;
+  let slug = formData.get("slug") as string;
+  // Gunakan any atau type spesifik agar tidak bentrok jika EventType belum di-import
+  const eventType = formData.get("eventType") as any; 
+
+  if (!title || !slug) return { error: "Nama acara dan URL wajib diisi." };
+
+  // Format slug agar aman (huruf kecil, tanpa spasi, hanya alphanumeric dan strip)
+  slug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+  try {
+    // 1. Validasi Akses Workspace
+    const workspace = await prisma.workspace.findUnique({
+      where: { slug: workspaceSlug },
+    });
+
+    if (!workspace) return { error: "Workspace tidak ditemukan." };
+
+    if (session.user.systemRole !== "SUPERADMIN") {
+      const isMember = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: session.user.id, workspaceId: workspace.id } }
+      });
+      if (!isMember) return { error: "Anda tidak memiliki izin di Workspace ini." };
+    }
+
+    // 2. Cek Duplikasi URL (Slug bersifat unik secara global)
+    const existingProject = await prisma.project.findUnique({ where: { slug } });
+    if (existingProject) {
+      return { error: "URL acara tersebut sudah digunakan. Silakan gunakan kombinasi nama lain." };
+    }
+
+    // [DI SINI NANTI KITA MASUKKAN LOGIKA PEMOTONGAN TOKEN/KREDIT PARTNER]
+
+    // 3. Penciptaan Proyek (Otonomi Penuh)
+    const newProject = await prisma.project.create({
+      data: {
+        title,
+        slug,
+        eventType,
+        workspaceId: workspace.id,
+        packageTier: "ESSENTIAL", // Default awal
+      }
+    });
+
+    revalidatePath(`/workspace/${workspaceSlug}`);
+    return { success: true, projectSlug: newProject.slug };
+
+  } catch (error) {
+    console.error("Gagal membuat proyek:", error);
+    return { error: "Terjadi kesalahan internal server." };
+  }
+}

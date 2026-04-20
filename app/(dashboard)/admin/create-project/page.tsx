@@ -1,15 +1,15 @@
 import { auth } from "@/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import CreateProjectForm from "./CreateProjectForm"; // Import otot pengirim data kita
 
 export default async function AdminCreateProjectPage() {
     const session = await auth();
-    if (session?.user?.role !== "ADMIN") redirect("/");
+    if (session?.user?.systemRole !== "SUPERADMIN") redirect("/");
 
     const clients = await prisma.user.findMany({
-        where: { role: "CLIENT" },
+        where: { systemRole: "USER" },
         select: { id: true, name: true, email: true } 
     });
 

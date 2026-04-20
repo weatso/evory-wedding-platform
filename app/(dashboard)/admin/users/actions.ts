@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
@@ -12,7 +12,7 @@ export type ActionState = {
 
 export async function addUserAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN" && session?.user?.role !== "PARTNER") {
+  if (session?.user?.systemRole !== "SUPERADMIN") {
     return { errors: "Unauthorized" };
   }
 
@@ -28,7 +28,7 @@ export async function addUserAction(prevState: ActionState, formData: FormData):
         name: formData.get("name") as string,
         email: email,
         password: await hash(password, 10),
-        role: formData.get("role") as any,
+        systemRole: (formData.get("role") as string) === "ADMIN" ? "SUPERADMIN" : "USER",
       },
     });
 

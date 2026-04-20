@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,14 @@ import AddStaffModal from "../_components/AddStaffModal"; // Sesuaikan path ini 
 
 export default async function AdminUsersPage() {
     const session = await auth();
-    if (session?.user?.role !== "ADMIN") redirect("/");
+    if (session?.user?.systemRole !== "SUPERADMIN") redirect("/");
 
     // Tarik data pengguna beserta jumlah PROYEK yang mereka miliki
     const users = await prisma.user.findMany({
         orderBy: { createdAt: "desc" },
         include: {
             _count: {
-                select: { projects: true } // Murni menghitung relasi proyek
+                select: { workspaces: true } // Mengganti projects dengan workspaces
             }
         }
     });
@@ -50,16 +50,15 @@ export default async function AdminUsersPage() {
                                     <TableCell className="text-slate-600 text-sm">{user.email}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={
-                                            user.role === "ADMIN" ? "bg-red-50 text-red-700 border-red-200 font-bold" :
-                                            user.role === "PARTNER" ? "bg-blue-50 text-blue-700 border-blue-200 font-bold" :
+                                            user.systemRole === "SUPERADMIN" ? "bg-red-50 text-red-700 border-red-200 font-bold" :
                                             "bg-slate-100 text-slate-600 border-slate-200 font-bold"
                                         }>
-                                            {user.role}
+                                            {user.systemRole}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
                                         <Badge className="bg-[#E5C185] text-[#07303F] hover:bg-[#d4b074] border-0 font-bold">
-                                            {user._count.projects} Proyek Aktif
+                                            {user._count.workspaces} Ruang Kerja
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-slate-500 text-xs text-right font-medium">
