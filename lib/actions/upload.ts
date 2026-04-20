@@ -4,13 +4,13 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2Client } from "@/lib/r2";
-import { auth } from "@/auth"; // Sesuaikan path jika letak auth.ts Anda berbeda
+import { auth } from "@/auth"; 
 import crypto from "crypto";
 
 export async function getPresignedUploadUrl(
   fileName: string, 
   contentType: string, 
-  destination: "client" | "system" | "wcc",
+  destination: "client" | "system" | "wcc" | "project", // <-- PERBAIKAN TIPE: Tambahkan "project"
   folder: string = "general"
 ) {
   const session = await auth();
@@ -21,28 +21,33 @@ export async function getPresignedUploadUrl(
   let bucketName: string | undefined;
   let publicUrlBase: string | undefined;
 
+  // ROUTING BUCKET CLOUDFLARE R2
   if (destination === "wcc") {
     bucketName = process.env.R2_WCC_BUCKET;
     publicUrlBase = process.env.R2_WCC_PUBLIC_URL;
-  } else if (destination === "client") {
+  } else if (destination === "client" || destination === "project") {
+    // Aset Evory Vault (project) masuk ke dalam bucket klien
     bucketName = process.env.R2_CLIENT_BUCKET;
     publicUrlBase = process.env.R2_CLIENT_PUBLIC_URL;
   } else {
+    // Destinasi "system" untuk template global dll
     bucketName = process.env.R2_TEMPLATE_BUCKET;
     publicUrlBase = process.env.R2_TEMPLATE_PUBLIC_URL;
   }
 
   if (!bucketName || !publicUrlBase) {
-    throw new Error("Konfigurasi server untuk R2 belum lengkap.");
+    throw new Error("Konfigurasi server (Environment Variables) untuk R2 belum lengkap.");
   }
 
-  // 3. Sanitasi Nama File (Mencegah file tertimpa jika namanya sama)
+  // Sanitasi Nama File (Mencegah file tertimpa jika namanya sama)
   const uniqueId = crypto.randomBytes(8).toString("hex");
   const extension = fileName.split(".").pop();
-  // Hasil: galleries/a1b2c3d4-1708123456.jpg
+  
+  // Format akhir: nama-proyek/a1b2c3d4-1708123456.jpg
+  // File S3 akan terorganisir rapi di dalam folder masing-masing proyek
   const safeFileName = `${folder}/${uniqueId}-${Date.now()}.${extension}`;
 
-  // 4. Siapkan Perintah S3
+  // Siapkan Perintah S3
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: safeFileName,
@@ -50,7 +55,7 @@ export async function getPresignedUploadUrl(
   });
 
   try {
-    // 5. Cetak Tiket Sementara (Berlaku 5 Menit)
+    // Cetak Tiket Sementara (Berlaku 5 Menit / 300 detik)
     const signedUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 });
     
     return { 
@@ -60,6 +65,6 @@ export async function getPresignedUploadUrl(
     };
   } catch (error) {
     console.error("Gagal men-generate Presigned URL:", error);
-    return { success: false, error: "Gagal membuat tiket upload" };
+    return { success: false, error: "Gagal membuat tiket upload." };
   }
 }
