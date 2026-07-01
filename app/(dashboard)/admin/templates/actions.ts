@@ -117,6 +117,64 @@ export async function createTemplate(formData: FormData) {
   }
 }
 
+export async function updateTemplate(id: string, formData: FormData) {
+  const session = await auth();
+  if (session?.user?.systemRole !== "SUPERADMIN") {
+    return { error: "Unauthorized Access" };
+  }
+
+  const rawData = {
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    categoryId: formData.get("categoryId"),
+    thumbnail: formData.get("thumbnail"),
+    previewUrl: formData.get("previewUrl"),
+    description: formData.get("description"),
+    tier: formData.get("tier"),
+    isFeatured: formData.get("isFeatured"),
+  };
+
+  const validated = TemplateSchema.safeParse(rawData);
+  if (!validated.success) {
+    return { error: "Data tidak valid. Cek kembali inputan Anda." };
+  }
+
+  const { name, slug, categoryId, thumbnail, previewUrl, description, tier, isFeatured } = validated.data;
+
+  try {
+    const existingTemplate = await prisma.template.findUnique({ where: { id } });
+    if (!existingTemplate) return { error: "Template tidak ditemukan." };
+
+    if (existingTemplate.slug !== slug) {
+      const duplicateSlug = await prisma.template.findUnique({ where: { slug } });
+      if (duplicateSlug) return { error: `Slug "${slug}" sudah digunakan.` };
+    }
+
+    await prisma.template.update({
+      where: { id },
+      data: {
+        name,
+        slug,
+        categoryId,
+        thumbnail,
+        description: description || "",
+        previewUrl: previewUrl || `/preview/${slug}`,
+        previewText: name.substring(0, 3).toUpperCase(),
+        tier: (tier as PackageTier) || PackageTier.ESSENTIAL,
+        isFeatured: isFeatured === "true",
+      },
+    });
+
+    revalidatePath("/admin/templates");
+    revalidatePath("/collection");
+    revalidatePath("/");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Update Template Error:", error);
+    return { error: "Gagal mengupdate template." };
+  }
+}
 export async function deleteTemplate(id: string) {
   const session = await auth();
   if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };

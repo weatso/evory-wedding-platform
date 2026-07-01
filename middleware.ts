@@ -11,40 +11,26 @@ export default auth((req) => {
 
   // 1. Definisikan Route
   const isAdminRoute = nextUrl.pathname.startsWith("/admin");
-  const isUsherRoute = nextUrl.pathname.startsWith("/usher");
-  const isClientRoute = nextUrl.pathname.startsWith("/dashboard");
+  const isWorkspaceRoute = nextUrl.pathname.startsWith("/workspace");
+  const isDashboardRoute = nextUrl.pathname.startsWith("/dashboard");
   const isAuthRoute = nextUrl.pathname.startsWith("/login");
 
   // 2. Logic Redirect Terpusat
   if (isAuthRoute && isLoggedIn) {
-    if (userRole === "ADMIN" || userRole === "PARTNER") return NextResponse.redirect(new URL("/admin", nextUrl));
-    if (userRole === "USHER") return NextResponse.redirect(new URL("/usher", nextUrl));
+    if (userRole === "SUPERADMIN") return NextResponse.redirect(new URL("/admin", nextUrl));
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // 3. Karantina Wilayah Admin & Partner
+  // 3. Karantina Wilayah Admin
   if (isAdminRoute) {
     if (!isLoggedIn) return NextResponse.redirect(new URL("/login", nextUrl));
-    // Jika Client atau Usher mencoba masuk /admin, tendang!
-    if (userRole === "CLIENT") return NextResponse.redirect(new URL("/dashboard", nextUrl));
-    if (userRole === "USHER") return NextResponse.redirect(new URL("/usher", nextUrl));
-    
-    // PERTAHANAN ABSOLUT: Partner tidak boleh masuk ke manajemen template pusat
-    if (userRole === "PARTNER" && nextUrl.pathname.startsWith("/admin/templates")) {
-      return NextResponse.redirect(new URL("/admin", nextUrl));
-    }
+    if (userRole !== "SUPERADMIN") return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // 4. Karantina Wilayah Usher
-  if (isUsherRoute) {
+  // 4. Karantina Wilayah Workspace & Dashboard
+  if (isWorkspaceRoute || isDashboardRoute) {
     if (!isLoggedIn) return NextResponse.redirect(new URL("/login", nextUrl));
-    if (userRole === "CLIENT") return NextResponse.redirect(new URL("/dashboard", nextUrl));
-  }
-
-  // 5. Karantina Wilayah Client
-  if (isClientRoute) {
-    if (!isLoggedIn) return NextResponse.redirect(new URL("/login", nextUrl));
-    if (userRole === "USHER") return NextResponse.redirect(new URL("/usher", nextUrl));
+    if (userRole === "WAITING") return NextResponse.redirect(new URL("/waiting-room", nextUrl));
   }
 
   return NextResponse.next();

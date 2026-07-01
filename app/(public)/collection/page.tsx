@@ -9,16 +9,17 @@ import { Suspense } from "react";
 export default async function CollectionPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const query = typeof searchParams.q === 'string' ? searchParams.q : undefined;
-  const categorySlug = typeof searchParams.category === 'string' ? searchParams.category : undefined;
-  const tierString = typeof searchParams.tier === 'string' ? searchParams.tier.toUpperCase() : undefined;
+  const resolvedSearchParams = await searchParams;
+  const query = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined;
+  const categorySlug = typeof resolvedSearchParams.category === 'string' ? resolvedSearchParams.category : undefined;
+  const tierString = typeof resolvedSearchParams.tier === 'string' ? resolvedSearchParams.tier.toUpperCase() : undefined;
   
   const validTiers = Object.values(PackageTier);
   const tier = validTiers.includes(tierString as PackageTier) ? (tierString as PackageTier) : undefined;
 
-  const page = typeof searchParams.page === 'string' ? parseInt(searchParams.page) : 1;
+  const page = typeof resolvedSearchParams.page === 'string' ? parseInt(resolvedSearchParams.page) : 1;
   const limit = 12; 
   const skip = (page - 1) * limit;
 
@@ -85,54 +86,102 @@ export default async function CollectionPage({
 
           {/* AREA ETALASE GRID */}
           <main className="flex-1">
-            <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between border-b border-slate-200 pb-4 gap-4">
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between border-b border-slate-200 pb-4 gap-4">
               <h1 className="text-3xl lg:text-4xl font-serif italic text-[#07303F]">
-                {totalTemplates} Masterpieces
+                {resolvedSearchParams.tab === 'wcc' ? 'WCC Portfolios' : `${totalTemplates} Masterpieces`}
               </h1>
-              {query && (
+              {query && resolvedSearchParams.tab !== 'wcc' && (
                 <p className="text-sm text-slate-500">
                   Search results for: <span className="font-bold text-[#07303F]">"{query}"</span>
                 </p>
               )}
             </div>
 
-            {/* GRID TEMPLATE YANG DIPERBAIKI SECARA VISUAL */}
-            {templates.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-                {templates.map((template) => (
-                  <Link href={`/preview/${template.slug}`} key={template.id} className="group block">
-                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:shadow-2xl group-hover:-translate-y-2">
-                      
-                      {/* BINGKAI GAMBAR */}
-                      <div className="aspect-[3/4] bg-slate-100 rounded-xl mb-4 relative overflow-hidden">
-                        <Image 
-                          src={template.thumbnail} 
-                          alt={template.name} 
-                          fill 
-                          className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
-                        {/* BADGE TIER */}
-                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest text-[#07303F] shadow-sm">
-                          {template.tier}
-                        </div>
-                      </div>
+            {/* TAB NAVIGASI BERALIH ISI */}
+            <div className="flex items-center gap-4 mb-8 border-b border-slate-200 pb-px">
+              <Link 
+                href={`/collection?tab=templates${categorySlug ? `&category=${categorySlug}` : ''}`}
+                className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
+                  resolvedSearchParams.tab !== 'wcc' 
+                    ? 'border-b-2 border-[#07303F] text-[#07303F]' 
+                    : 'text-slate-400 hover:text-[#07303F]'
+                }`}
+              >
+                Templates
+              </Link>
+              <Link 
+                href="/collection?tab=wcc"
+                className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
+                  resolvedSearchParams.tab === 'wcc' 
+                    ? 'border-b-2 border-[#07303F] text-[#07303F]' 
+                    : 'text-slate-400 hover:text-[#07303F]'
+                }`}
+              >
+                WCC Portfolios
+              </Link>
+            </div>
 
-                      {/* TIPOGRAFI KARTU */}
-                      <div className="px-2 pb-2">
-                        <h3 className="font-bold text-lg text-[#07303F] group-hover:text-[#E5C185] transition-colors">{template.name}</h3>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1.5">{template.category.name}</p>
-                      </div>
-
+            {resolvedSearchParams.tab === 'wcc' ? (
+              // KONTEN: WCC PORTFOLIOS (DUMMY SEMENTARA)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {[1, 2, 3, 4].map((item) => (
+                  <div key={item} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 group cursor-pointer hover:shadow-xl transition-all">
+                    <div className="aspect-video bg-slate-100 rounded-xl mb-4 relative overflow-hidden flex items-center justify-center">
+                       <Image src={`https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop`} alt="WCC" fill className="object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
+                       <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                       <div className="absolute z-10 w-12 h-12 bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50">
+                          <div className="w-0 h-0 border-y-8 border-y-transparent border-l-[12px] border-l-white ml-1"></div>
+                       </div>
                     </div>
-                  </Link>
+                    <div className="px-2 pb-2">
+                      <h3 className="font-bold text-lg text-[#07303F]">The Wedding of Client #{item}</h3>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1.5">Wedding Concept & Creation</p>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
-              <div className="py-32 text-center text-slate-500 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 border-dashed">
-                <p className="text-2xl font-serif italic font-bold mb-3 text-[#07303F]">No Masterpieces Found.</p>
-                <p className="text-sm max-w-md">Koleksi yang Anda cari belum tersedia. Sesuaikan parameter filter Anda pada panel di sebelah kiri.</p>
-              </div>
+              // KONTEN: TEMPLATES
+              <>
+                {/* GRID TEMPLATE YANG DIPERBAIKI SECARA VISUAL */}
+                {templates.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+                    {templates.map((template) => (
+                      <Link href={`/preview/${template.slug}`} key={template.id} className="group block">
+                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:shadow-2xl group-hover:-translate-y-2">
+                          
+                          {/* BINGKAI GAMBAR */}
+                          <div className="aspect-[3/4] bg-slate-100 rounded-xl mb-4 relative overflow-hidden">
+                            <Image 
+                              src={template.thumbnail} 
+                              alt={template.name} 
+                              fill 
+                              className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            />
+                            {/* BADGE TIER */}
+                            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest text-[#07303F] shadow-sm">
+                              {template.tier}
+                            </div>
+                          </div>
+
+                          {/* TIPOGRAFI KARTU */}
+                          <div className="px-2 pb-2">
+                            <h3 className="font-bold text-lg text-[#07303F] group-hover:text-[#E5C185] transition-colors">{template.name}</h3>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1.5">{template.category.name}</p>
+                          </div>
+
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-32 text-center text-slate-500 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 border-dashed">
+                    <p className="text-2xl font-serif italic font-bold mb-3 text-[#07303F]">No Masterpieces Found.</p>
+                    <p className="text-sm max-w-md">Koleksi yang Anda cari belum tersedia. Sesuaikan parameter filter Anda pada panel di sebelah kiri.</p>
+                  </div>
+                )}
+              </>
             )}
 
             {/* PAGINATION DINAMIS */}

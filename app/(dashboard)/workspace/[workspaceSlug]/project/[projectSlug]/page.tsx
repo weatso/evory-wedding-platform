@@ -108,17 +108,19 @@ export default async function ProjectDashboardPage({
           </div>
         </Link>
 
-        {/* Modul: Pengaturan Acara (Client Details Form pindah ke sini nanti) */}
-        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-lg hover:border-[#E5C185]/50 transition-all h-full flex flex-col cursor-pointer group">
-          <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <Settings className="w-6 h-6" />
+        {/* Modul: Pengaturan Acara */}
+        <Link href={`/workspace/${workspaceSlug}/project/${projectSlug}/settings`} className="group">
+          <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-lg hover:border-[#E5C185]/50 transition-all h-full flex flex-col">
+            <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <Settings className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-[#07303F] mb-1">Pengaturan Acara</h3>
+            <p className="text-sm text-slate-500 mb-4 flex-1">Ubah nama pengantin, tanggal, lokasi venue, dan desain template undangan digital.</p>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end text-sm">
+              <span className="text-[#E5C185] font-bold">Konfigurasi →</span>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-[#07303F] mb-1">Pengaturan Acara</h3>
-          <p className="text-sm text-slate-500 mb-4 flex-1">Ubah nama pengantin, tanggal, lokasi venue, dan desain template undangan digital.</p>
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end text-sm">
-            <span className="text-[#E5C185] font-bold">Konfigurasi →</span>
-          </div>
-        </div>
+        </Link>
 
       </div>
     </div>

@@ -39,7 +39,6 @@ export async function assignWorkspaceToUser(formData: FormData) {
         data: {
           name: agencyName,
           slug: baseSlug,
-          tier: "ESSENTIAL",
           isActive: true,
         }
       });

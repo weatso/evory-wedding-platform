@@ -14,7 +14,7 @@ export default function ExportGuestsButton({ guests, slug }: { guests: any[], sl
         const baseUrl = window.location.origin;
 
         // 1. Siapkan Header CSV (Format Standar WA Blast)
-        let csvContent = "Nama Lengkap,Kategori,WhatsApp,Pax,Status RSVP,Link Undangan Unik\n";
+        let csvContent = "Nama Lengkap,Kategori,WhatsApp,Pax Diundang,Pax Hadir,Status RSVP,Check-In,Waktu Check-In,Link Undangan Unik\n";
 
         // 2. Looping Data Tamu dan Gabungkan
         guests.forEach(g => {
@@ -24,8 +24,10 @@ export default function ExportGuestsButton({ guests, slug }: { guests: any[], sl
             // Format pembersihan agar tidak merusak kolom Excel jika ada koma di nama
             const cleanPhone = g.whatsapp ? g.whatsapp.replace(/"/g, '""') : "";
             const cleanName = g.name.replace(/"/g, '""');
+            const checkInStatus = g.isCheckedIn ? "Hadir" : "Belum Hadir";
+            const checkInTime = g.checkInTime ? new Date(g.checkInTime).toLocaleString('id-ID') : "-";
             
-            csvContent += `"${cleanName}","${g.category || ''}","${cleanPhone}","${g.totalPaxAllocated}","${g.rsvpStatus}","${link}"\n`;
+            csvContent += `"${cleanName}","${g.category || ''}","${cleanPhone}","${g.totalPaxAllocated}","${g.pax}","${g.rsvpStatus}","${checkInStatus}","${checkInTime}","${link}"\n`;
         });
 
         // 3. Bangun Mesin Pengunduh (Blob)

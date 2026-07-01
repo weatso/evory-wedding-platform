@@ -24,10 +24,10 @@ export default async function CreateProjectPage({
           </p>
         </div>
         <h1 className="text-3xl md:text-4xl font-serif text-[#07303F]">
-          Proyek Acara Baru
+          Registrasi Klien Baru
         </h1>
         <p className="text-slate-500 mt-2 text-sm">
-          Buat acara baru untuk klien Anda. URL yang Anda pilih di sini akan menjadi tautan permanen untuk undangan digital dan sistem manajemen tamu klien.
+          Buat akun untuk klien Anda. URL yang Anda pilih di sini akan menjadi tautan permanen untuk undangan digital dan sistem manajemen tamu milik klien tersebut.
         </p>
       </div>
 

@@ -1,8 +1,11 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { LayoutTemplate, ShieldCheck } from "lucide-react";
+import { LayoutTemplate, ShieldCheck, AlertTriangle } from "lucide-react";
 import ClientDetailsForm from "@/components/dashboard/project/ClientDetailsForm";
+import CrmPortalConfigForm from "@/components/dashboard/project/CrmPortalConfigForm";
+import ProjectFinancialForm from "@/components/dashboard/project/ProjectFinancialForm";
+import { DeleteProjectButton } from "../_components/DeleteProjectButton";
 
 export default async function ProjectSettingsPage({
   params,
@@ -38,9 +41,9 @@ export default async function ProjectSettingsPage({
           <p className="text-[10px] font-bold tracking-widest text-[#E5C185] uppercase mb-1">
             Konfigurasi Sistem
           </p>
-          <h1 className="text-3xl font-serif text-[#07303F]">Pengaturan Acara</h1>
+          <h1 className="text-3xl font-serif text-[#07303F]">Detail Klien & Acara</h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Modifikasi data dasar, lokasi venue, dan estetika undangan digital untuk <span className="font-bold text-[#07303F]">{project.title}</span>.
+            Modifikasi profil klien, detail acara, dan estetika undangan digital untuk <span className="font-bold text-[#07303F]">{project.title}</span>.
           </p>
         </div>
       </div>
@@ -50,6 +53,8 @@ export default async function ProjectSettingsPage({
         {/* KOLOM KIRI: FORMULIR UTAMA (Lebar 7/12) */}
         <div className="lg:col-span-7 space-y-6">
            <ClientDetailsForm project={project} />
+           <CrmPortalConfigForm project={project} workspaceSlug={workspaceSlug} />
+           <ProjectFinancialForm project={project} />
         </div>
 
         {/* KOLOM KANAN: PENGATURAN TEMPLATE & KEAMANAN (Lebar 5/12) */}
@@ -77,13 +82,14 @@ export default async function ProjectSettingsPage({
           </div>
 
           {/* Panel Zona Bahaya / Info */}
-          <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl shadow-sm">
-            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-4 h-4 text-slate-400" /> Otoritas Proyek
+          <div className="bg-red-50/50 border border-red-100 p-6 rounded-2xl shadow-sm">
+            <h3 className="text-sm font-bold text-red-600 flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-red-500" /> Danger Zone
             </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Proyek ini terikat secara permanen pada Workspace <span className="font-bold text-[#07303F]">{workspaceSlug}</span>. Hanya admin agensi dan Evory Pusat yang memiliki hak untuk mengubah konfigurasi ini atau menghapus proyek secara permanen.
+            <p className="text-xs text-red-600/80 leading-relaxed mb-6">
+              Tindakan menghapus klien akan menghapus semua data yang terkait dengan akun ini secara permanen, termasuk buku tamu, aset, dan konfigurasi. Tindakan ini tidak dapat dibatalkan.
             </p>
+            <DeleteProjectButton projectId={project.id} />
           </div>
 
         </div>

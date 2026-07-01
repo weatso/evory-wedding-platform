@@ -44,29 +44,26 @@ const DUMMY_PREVIEW_DATA = {
   ]
 };
 
+import { prisma } from "@/lib/prisma";
+
 export default async function TemplatePreviewPage({ params }: { params: Promise<{ templateSlug: string }> }) {
   const resolvedParams = await params;
   const { templateSlug } = resolvedParams;
 
-  if (!TEMPLATE_REGISTRY[templateSlug]) {
+  // Ambil Template dari Database
+  const template = await prisma.template.findUnique({
+    where: { slug: templateSlug }
+  });
+
+  if (!template) {
     return notFound();
   }
 
-  // Suntikkan slug template ke dalam data dummy
+  // Suntikkan data asli template ke dalam project tiruan
   const previewInvitation = {
     ...DUMMY_PREVIEW_DATA,
-    templateId: "preview-template",
-    template: {
-      id: "preview-template",
-      slug: templateSlug, // <--- Penentu template mana yang di-render
-      name: "Preview Template",
-      categoryId: "preview-cat",
-      thumbnail: "",
-      previewUrl: "",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
+    templateId: template.id,
+    template: template,
   };
 
   return (

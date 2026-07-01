@@ -20,22 +20,28 @@ export default function BaseGallery({ images, styles = {} }: BaseGalleryProps) {
     <div className={`relative ${styles.wrapper || "w-full"}`}>
       {styles.title && <h3 className={styles.title}>Galeri Foto</h3>}
       
-      <div className={styles.gridContainer || "grid grid-cols-2 gap-3"}>
-        {images.map((url, i) => (
-          <div 
-            key={i} 
-            className={`${styles.imageFrame || "relative overflow-hidden rounded-xl shadow-md bg-stone-200"} ${i % 3 === 0 ? (styles.imageSpan || "col-span-2 aspect-video") : "aspect-[3/4]"}`}
-          >
-            <Image 
-              src={url} 
-              alt={`Gallery ${i}`} 
-              fill 
-              className="object-cover transition-transform duration-700 hover:scale-110" 
-              sizes="(max-width: 768px) 100vw, 33vw" 
-              unoptimized 
-            />
-          </div>
-        ))}
+      <div className={styles.gridContainer || "columns-2 gap-3 space-y-3"}>
+        {images.map((itemString, i) => {
+          const url = itemString.split('|')[0];
+          const blurData = itemString.split('|')[1];
+          return (
+            <div 
+              key={i} 
+              className={`${styles.imageFrame || "relative overflow-hidden rounded-xl shadow-md bg-stone-200 mb-3 break-inside-avoid"}`}
+            >
+              <Image 
+                src={url} 
+                alt={`Gallery ${i}`} 
+                width={500}
+                height={700}
+                className="w-full h-auto object-cover transition-transform duration-700 hover:scale-110" 
+                sizes="(max-width: 768px) 100vw, 33vw" 
+                placeholder={blurData ? "blur" : "empty"}
+                blurDataURL={blurData}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

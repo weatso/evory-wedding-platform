@@ -56,6 +56,7 @@ export default function CreateProjectForm({ workspaceSlug }: { workspaceSlug: st
             name="title"
             type="text"
             required
+            placeholder="Msl: Pernikahan Raffi & Gigi"
             value={title}
             onChange={handleTitleChange}
             className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#E5C185]/50 outline-none text-slate-700"
@@ -106,7 +107,7 @@ export default function CreateProjectForm({ workspaceSlug }: { workspaceSlug: st
           Terhubung ke {workspaceSlug}
         </div>
         <Button type="submit" disabled={isLoading} className="bg-[#07303F] text-[#E5C185] hover:bg-[#0a465c] font-bold h-12 px-8">
-          {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Ciptakan Proyek"}
+          {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Daftarkan Klien"}
         </Button>
       </div>
     </form>

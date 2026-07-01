@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Copy, MoreHorizontal, Pencil, Trash2, Send } from "lucide-react";
+import { Copy, MoreHorizontal, Pencil, Trash2, Send, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import {
     Dialog,
@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { deleteGuest, updateGuest } from "@/app/(dashboard)/workspace/[workspaceSlug]/actions";
+import { processCheckIn } from "@/app/(dashboard)/workspace/[workspaceSlug]/project/[projectSlug]/scanner/actions";
 
 export interface GuestData {
     id: string;
@@ -38,7 +39,10 @@ export interface GuestData {
 export default function GuestRowActions({ guest, projectSlug }: { guest: any; projectSlug: string; }) {
     const [openEdit, setOpenEdit] = useState(false);
     const [openDelete, setOpenDelete] = useState(false);
+    const [openCheckIn, setOpenCheckIn] = useState(false);
     const [loading, setLoading] = useState(false);
+    
+    const [paxInput, setPaxInput] = useState<string>(guest.totalPaxAllocated.toString());
 
     const [editData, setEditData] = useState({
         name: guest.name,
@@ -116,6 +120,34 @@ export default function GuestRowActions({ guest, projectSlug }: { guest: any; pr
         window.open(waUrl, '_blank');
     };
 
+    // --- LOGIC BARU: CHECK-IN MANUAL ---
+    const handleManualCheckIn = async () => {
+        setLoading(true);
+        try {
+            const paxValue = parseInt(paxInput);
+            if (isNaN(paxValue) || paxValue < 1) {
+                toast.warning("Jumlah pax minimal 1");
+                setLoading(false);
+                return;
+            }
+
+            const res = await processCheckIn(guest.guestCode, projectSlug, paxValue);
+            if (res.success) {
+                toast.success(`${guest.name} berhasil Check-In!`);
+                setOpenCheckIn(false);
+            } else if (res.alreadyCheckedIn) {
+                toast.error(`${guest.name} sudah Check-In sebelumnya.`);
+                setOpenCheckIn(false);
+            } else {
+                toast.error(res.error || "Gagal Check-In");
+            }
+        } catch (error) {
+            toast.error("Terjadi kesalahan jaringan.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <>
             <DropdownMenu>
@@ -135,6 +167,12 @@ export default function GuestRowActions({ guest, projectSlug }: { guest: any; pr
                     <DropdownMenuItem onClick={sendWhatsapp} className="cursor-pointer font-medium">
                         <Send className="mr-2 h-4 w-4 text-green-600" /> Kirim WhatsApp
                     </DropdownMenuItem>
+
+                    {!guest.isCheckedIn && (
+                        <DropdownMenuItem onClick={() => setOpenCheckIn(true)} className="cursor-pointer font-medium text-emerald-600 focus:text-emerald-700">
+                            <CheckCircle2 className="mr-2 h-4 w-4" /> Check-In Manual
+                        </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuSeparator />
                     
@@ -190,6 +228,40 @@ export default function GuestRowActions({ guest, projectSlug }: { guest: any; pr
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setOpenDelete(false)}>Batal</Button>
                         <Button variant="destructive" onClick={handleDelete} disabled={loading}>{loading ? "..." : "Hapus"}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* --- MODAL CHECK-IN MANUAL --- */}
+            <Dialog open={openCheckIn} onOpenChange={setOpenCheckIn}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Check-In Manual</DialogTitle>
+                        <DialogDescription>
+                            Anda akan melakukan check-in untuk <b>{guest.name}</b>.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label htmlFor="paxActual" className="text-sm font-bold text-slate-700 mb-2 block">
+                            Jumlah Tamu Aktual (Pax) yang Hadir
+                        </Label>
+                        <Input 
+                            id="paxActual" 
+                            type="number" 
+                            min={1} 
+                            value={paxInput} 
+                            onChange={(e) => setPaxInput(e.target.value)} 
+                            className="h-12 text-lg font-bold"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                            Alokasi undangan untuk tamu ini adalah: {guest.totalPaxAllocated} Pax.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpenCheckIn(false)}>Batal</Button>
+                        <Button onClick={handleManualCheckIn} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                            {loading ? "Memproses..." : "Konfirmasi Check-In"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

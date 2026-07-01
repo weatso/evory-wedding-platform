@@ -10,7 +10,7 @@ interface Props {
   folder?: string; // Menjadi opsional
   destination?: "client" | "system" | "wcc" | "project"; // Tambahkan "project" untuk Vault
   path?: string;
-  onUploadComplete?: (url: string) => void; // Menjadi opsional
+  onUploadComplete?: (url: string, blurData?: string) => void;
   label?: string;
   className?: string;
 }
@@ -32,12 +32,34 @@ export default function SimpleUploadButton({
     const file = e.target.files[0];
     setUploading(true);
 
+    let finalFileToUpload = file;
+    // Kompresi jika tipe file adalah gambar (kecuali SVG/GIF yang biasanya rusak jika dikompres biasa)
+    if (file.type.startsWith("image/") && !file.type.includes("svg") && !file.type.includes("gif")) {
+      try {
+        const imageCompression = (await import('browser-image-compression')).default;
+        const options = {
+          maxSizeMB: 0.5, // Target 500KB
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          fileType: "image/webp" // Konversi ke webp untuk performa maksimal
+        };
+        const compressedFile = await imageCompression(file, options);
+        finalFileToUpload = compressedFile as File;
+      } catch (err) {
+        console.warn("Gagal mengkompresi gambar, menggunakan file asli.", err);
+      }
+    }
+
     // Amankan path upload
     const uploadPath = path || folder || "unassigned";
 
     try {
       // 1. Minta Tiket dari Server
-      const res = await getPresignedUploadUrl(file.name, file.type, destination, uploadPath);
+      const finalFileName = finalFileToUpload.type === "image/webp" 
+        ? finalFileToUpload.name.replace(/\.[^/.]+$/, "") + ".webp" 
+        : finalFileToUpload.name;
+        
+      const res = await getPresignedUploadUrl(finalFileName, finalFileToUpload.type, destination, uploadPath);
       if (!res.success || !res.uploadUrl) {
         throw new Error(res.error || "Gagal mendapatkan izin upload S3/R2.");
       }
@@ -45,18 +67,47 @@ export default function SimpleUploadButton({
       // 2. Tembak file langsung ke Cloudflare R2 (Bypass Server Lokal)
       const uploadResponse = await fetch(res.uploadUrl, {
         method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
+        body: finalFileToUpload,
+        headers: { "Content-Type": finalFileToUpload.type },
       });
 
       if (!uploadResponse.ok) throw new Error("Gagal mengunggah file ke infrastruktur CDN.");
+
+      let blurDataUrl: string | undefined = undefined;
+      
+      // Jika gambar, buat Base64 LQIP (Low Quality Image Placeholder) via Canvas
+      if (file.type.startsWith("image/")) {
+        try {
+          const img = document.createElement("img");
+          const objectUrl = URL.createObjectURL(file);
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = objectUrl;
+          });
+          
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            // Resize ke ukuran sangat kecil (misal 10px lebarnya)
+            const ratio = img.height / img.width;
+            canvas.width = 10;
+            canvas.height = Math.max(1, 10 * ratio);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            blurDataUrl = canvas.toDataURL("image/webp", 0.5);
+          }
+          URL.revokeObjectURL(objectUrl);
+        } catch (err) {
+          console.warn("Gagal membuat blur placeholder", err);
+        }
+      }
 
       toast.success("Aset berhasil diunggah!");
       
       // 3. Resolusi Pintar
       if (onUploadComplete) {
-        // Jika form induk meminta URL (contoh: Form ganti foto profil)
-        onUploadComplete(res.finalUrl!);
+        // Jika form induk meminta URL, berikan URL dan blurData (jika ada)
+        onUploadComplete(res.finalUrl!, blurDataUrl);
       } else {
         // Jika digunakan di Vault, cukup refresh halaman agar data terbaru muncul dari server
         router.refresh(); 

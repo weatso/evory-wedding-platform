@@ -50,29 +50,29 @@ export default async function WorkspaceOverviewPage({
           </p>
           <h1 className="text-3xl font-serif text-[#07303F]">{workspace.name}</h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Kelola seluruh portofolio proyek acara dan undangan digital klien Anda.
+            Kelola seluruh akun klien dan undangan digital yang ditangani oleh agensi Anda.
           </p>
         </div>
         
         <Link href={`/workspace/${workspaceSlug}/create-project`}>
           <Button className="bg-[#07303F] text-[#E5C185] hover:bg-[#0a465c] font-bold shadow-lg shadow-[#07303F]/20 h-12 px-6">
-            <Plus className="w-5 h-5 mr-2" /> Ciptakan Proyek
+            <Plus className="w-5 h-5 mr-2" /> Registrasi Klien Baru
           </Button>
         </Link>
       </div>
 
-      {/* DAFTAR PROYEK (KAVLING ACARA) */}
+      {/* DAFTAR KLIEN */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
         {workspace.projects.length === 0 ? (
           <div className="col-span-full bg-white border border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center">
             <FolderGit2 className="w-16 h-16 text-slate-200 mb-4" />
-            <h3 className="text-[#07303F] font-bold text-lg">Portofolio Kosong</h3>
+            <h3 className="text-[#07303F] font-bold text-lg">Belum Ada Klien</h3>
             <p className="text-slate-400 text-sm mt-1 mb-6 max-w-md">
-              Agensi Anda belum memiliki acara yang terdaftar. Mulai buat proyek pertama Anda untuk mendistribusikan undangan digital.
+              Agensi Anda belum memiliki klien yang terdaftar. Mulai daftarkan akun klien pertama Anda.
             </p>
             <Link href={`/workspace/${workspaceSlug}/create-project`}>
               <Button variant="outline" className="border-slate-200 text-[#07303F] hover:border-[#E5C185] hover:text-[#b59050]">
-                Buat Proyek Pertama
+                Daftarkan Klien Pertama
               </Button>
             </Link>
           </div>
@@ -102,7 +102,7 @@ export default async function WorkspaceOverviewPage({
                     <Users className="w-4 h-4 text-slate-400" /> {project._count.guests} Tamu
                   </span>
                   <span className="text-[#E5C185] font-bold uppercase tracking-wider text-[10px]">
-                    Masuk Command Center →
+                    Kelola Klien →
                   </span>
                 </div>
               </div>

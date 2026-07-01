@@ -36,15 +36,18 @@ export default function ClientAssetsForm({ projectId, userId, initialCover, init
       toast.success(`Aset ${type} berhasil diperbarui!`);
   };
 
-  const handleGalleryUpload = async (url: string) => {
-      setGallery([...gallery, url]); 
-      await addToGallery(projectId, url);
+  const handleGalleryUpload = async (url: string, blurData?: string) => {
+      // Simpan URL dan blurData dipisah dengan pipa '|'
+      const finalString = blurData ? `${url}|${blurData}` : url;
+      setGallery([...gallery, finalString]); 
+      await addToGallery(projectId, finalString);
   };
 
-  const handleDeleteFromGallery = async (url: string) => {
+  const handleDeleteFromGallery = async (itemString: string) => {
+      const url = itemString.split('|')[0];
       if (cover === url) { toast.error("Tidak bisa menghapus Cover!"); return; }
-      setGallery(gallery.filter(g => g !== url));
-      await removeFromGallery(projectId, url, gallery);
+      setGallery(gallery.filter(g => g !== itemString));
+      await removeFromGallery(projectId, itemString, gallery);
   };
 
   return (
@@ -96,14 +99,23 @@ export default function ClientAssetsForm({ projectId, userId, initialCover, init
       <TabsContent value="gallery" className="space-y-4">
         <div className="flex justify-between"><h3 className="text-lg font-bold">Galeri Foto</h3><SimpleUploadButton destination="client" path={`${basePath}/gallery`} onUploadComplete={handleGalleryUpload} label="Tambah Foto"/></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {gallery.map((url, idx) => {
+            {gallery.map((itemString, idx) => {
+                const url = itemString.split('|')[0];
+                const blurData = itemString.split('|')[1];
                 const isCover = url === cover;
                 return (
                     <div key={idx} className={`group relative aspect-[3/4] rounded-lg overflow-hidden border-2 ${isCover ? 'border-amber-400' : 'border-transparent'}`}>
-                        <Image src={url} alt="Gallery" fill className="object-cover" />
+                        <Image 
+                           src={url} 
+                           alt="Gallery" 
+                           fill 
+                           className="object-cover" 
+                           placeholder={blurData ? "blur" : "empty"}
+                           blurDataURL={blurData}
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col justify-center gap-2 p-2">
                             {!isCover && <Button size="sm" variant="secondary" onClick={() => handleSetImage("cover", url, setCover)}>Jadikan Cover</Button>}
-                            <Button size="sm" variant="destructive" onClick={() => handleDeleteFromGallery(url)}>Hapus</Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteFromGallery(itemString)}>Hapus</Button>
                         </div>
                     </div>
                 )

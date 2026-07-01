@@ -55,6 +55,57 @@ export async function addStaff(formData: FormData) {
   }
 }
 
+export async function promoteToSuperadmin(userId: string) {
+  const session = await auth();
+  if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { systemRole: "SUPERADMIN" }
+    });
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error) {
+    return { error: "Gagal memperbarui peran." };
+  }
+}
+
+export async function demoteToUser(userId: string) {
+  const session = await auth();
+  if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };
+  
+  // Prevent demoting yourself to avoid locking everyone out
+  if (session.user.id === userId) return { error: "Tidak dapat menurunkan jabatan akun sendiri." };
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { systemRole: "USER" }
+    });
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error) {
+    return { error: "Gagal memperbarui peran." };
+  }
+}
+
+export async function approveUser(userId: string) {
+  const session = await auth();
+  if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized" };
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { systemRole: "USER" }
+    });
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error) {
+    return { error: "Gagal menyetujui pengguna." };
+  }
+}
+
 export async function createProjectAction(formData: FormData) {
   const session = await auth();
   if (session?.user?.systemRole !== "SUPERADMIN") return { error: "Unauthorized: Akses ditolak." };
@@ -94,6 +145,8 @@ export async function createProjectAction(formData: FormData) {
         workspaceId = newWorkspace.id;
     }
 
+    const { getDefaultEventMetadata, getDefaultThemeConfig } = await import("@/lib/template-presets");
+
     const project = await prisma.project.create({
         data: {
             title,
@@ -102,8 +155,8 @@ export async function createProjectAction(formData: FormData) {
             workspaceId,
             templateId,
             activeModules,
-            eventMetadata: {},
-            themeConfig: {}
+            eventMetadata: getDefaultEventMetadata(eventType),
+            themeConfig: getDefaultThemeConfig(eventType)
         }
     });
   } catch (error: any) {

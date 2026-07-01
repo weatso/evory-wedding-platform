@@ -54,7 +54,6 @@ export async function processApplication(applicationId: string, action: "APPROVE
         data: {
           name: application.agencyName,
           slug: baseSlug,
-          tier: "ESSENTIAL", // Tier awal default
           isActive: true,
         }
       });

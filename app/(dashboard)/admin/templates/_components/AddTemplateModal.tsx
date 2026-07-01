@@ -73,9 +73,9 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#07303F] text-white hover:bg-[#07303F]/90">+ Tambah Template</Button>
+        <Button className="bg-[#07303F] text-[#E5C185] hover:bg-[#0a465c] font-bold shadow-md">+ Tambah Template</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+      <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh] bg-[#F9F8F4]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-serif italic text-[#07303F]">Tambah Masterpiece Baru</DialogTitle>
         </DialogHeader>
@@ -85,7 +85,7 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* KOLOM KIRI: Identitas Dasar */}
             <div className="space-y-4">
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Nama Template</Label>
                 <Input 
                   name="name" 
@@ -93,26 +93,26 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
                   onChange={handleNameChange}
                   placeholder="Contoh: Javanese Kraton" 
                   required 
-                  className="mt-1" 
+                  className="bg-white border-slate-200" 
                 />
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Slug (ID URL)</Label>
                 <Input 
                   name="slug" 
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value)} // Tetap bisa diedit manual jika perlu
+                  onChange={(e) => setSlug(e.target.value)} 
                   placeholder="javanese-kraton" 
                   required 
-                  className="mt-1 bg-slate-50 font-mono text-sm" 
+                  className="bg-white border-slate-200 font-mono text-sm" 
                 />
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Kategori Desain</Label>
                 {categories.length > 0 ? (
-                  <select name="categoryId" className={`${selectStyle} mt-1`} required defaultValue="">
+                  <select name="categoryId" className={`${selectStyle} bg-white border-slate-200`} required defaultValue="">
                     <option value="" disabled>-- Pilih Kategori --</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -123,15 +123,16 @@ export function AddTemplateModal({ categories }: { categories: Category[] }) {
                 )}
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Deskripsi Singkat</Label>
                 <textarea 
                   name="description" 
                   placeholder="Jelaskan nuansa desain ini..." 
-                  className={`${selectStyle} mt-1 h-20 resize-none`}
+                  className={`${selectStyle} bg-white border-slate-200 h-20 resize-none`}
                   required
                 />
               </div>
+
             </div>
 
             {/* KOLOM KANAN: Visual & Konfigurasi Bisnis */}

@@ -7,6 +7,8 @@ import { AddTemplateModal } from "./_components/AddTemplateModal"; // Sesuaikan 
 import { AddCategoryModal } from "./_components/AddCategoryModal"; // Sesuaikan jalur import Anda
 import Image from "next/image";
 
+import { TemplateRowActions } from "./_components/TemplateRowActions";
+
 export default async function TemplateRegistryPage() {
   const session = await auth();
   if (!session || session.user.systemRole !== "SUPERADMIN") redirect("/dashboard");
@@ -170,9 +172,7 @@ export default async function TemplateRegistryPage() {
                                 <CheckCircle2 className="w-3 h-3" /> Etalase
                               </div>
                             )}
-                            <button className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors bg-white border border-slate-200 hover:border-red-200 px-3 py-1.5 rounded-sm">
-                                Hapus
-                            </button>
+                            <TemplateRowActions template={t} categories={categories} />
                           </div>
                         </td>
 

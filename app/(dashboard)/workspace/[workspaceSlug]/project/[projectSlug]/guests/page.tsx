@@ -1,9 +1,12 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import GuestForm from "@/components/dashboard/project/GuestForm"; // Sesuaikan path jika error
-import ExportGuestsButton from "@/components/dashboard/project/ExportGuestsButton"; // Sesuaikan path jika error
-import GuestRowActions from "@/components/dashboard/project/GuestRowActions"; // Sesuaikan path jika error
+import GuestForm from "@/components/dashboard/project/GuestForm";
+import BulkGuestDialog from "@/components/dashboard/project/BulkGuestDialog";
+import ExportGuestsButton from "@/components/dashboard/project/ExportGuestsButton";
+import GuestRowActions from "@/components/dashboard/project/GuestRowActions";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Users, QrCode, MessageSquare, CheckCircle2, Clock } from "lucide-react";
 
 export default async function ProjectGuestsPage({
@@ -65,6 +68,14 @@ export default async function ProjectGuestsPage({
         <div className="flex items-center gap-3">
           {/* Form Tambah Tamu (Client Component) */}
           <GuestForm projectId={project.id} />
+          
+          <BulkGuestDialog projectId={project.id} />
+          
+          <Link href={`/workspace/${workspaceSlug}/project/${projectSlug}/scanner`}>
+            <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold bg-white">
+              <QrCode className="w-4 h-4 mr-2" /> Buka Scanner
+            </Button>
+          </Link>
           
           <ExportGuestsButton 
              guests={guests.map(g => ({

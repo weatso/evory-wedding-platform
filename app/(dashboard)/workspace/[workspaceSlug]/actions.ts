@@ -10,6 +10,7 @@ const GuestSchema = z.object({
   whatsapp: z.string().optional().or(z.literal("")),
   category: z.string().optional(),
   totalPaxAllocated: z.coerce.number().min(1).default(1),
+  dietaryNotes: z.string().optional().nullable(),
 });
 
 function generateGuestCode() {
@@ -66,6 +67,7 @@ export async function addGuest(projectId: string, formData: FormData) {
     whatsapp: formData.get("whatsapp"),
     category: formData.get("category"), 
     totalPaxAllocated: formData.get("totalPaxAllocated"),
+    dietaryNotes: formData.get("dietaryNotes"),
   };
 
   const validated = GuestSchema.safeParse(rawData);
@@ -80,6 +82,7 @@ export async function addGuest(projectId: string, formData: FormData) {
         category: validated.data.category || "Regular", 
         guestCode: generateGuestCode(),
         totalPaxAllocated: validated.data.totalPaxAllocated, 
+        dietaryNotes: validated.data.dietaryNotes || null,
         rsvpStatus: "PENDING",
       },
     });
@@ -112,7 +115,7 @@ export async function deleteGuest(guestId: string) {
 
 export async function updateGuest(
   guestId: string, 
-  payload: { name: string; whatsapp?: string | null; category?: string | null; totalPaxAllocated: number; }
+  payload: { name: string; whatsapp?: string | null; category?: string | null; totalPaxAllocated: number; dietaryNotes?: string | null }
 ) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Unauthorized" };
@@ -130,7 +133,8 @@ export async function updateGuest(
         name: payload.name, 
         whatsapp: payload.whatsapp || "", 
         category: payload.category || "Regular", 
-        totalPaxAllocated: payload.totalPaxAllocated 
+        totalPaxAllocated: payload.totalPaxAllocated,
+        dietaryNotes: payload.dietaryNotes || null,
       }
     });
     revalidatePath(`/workspace/${projMeta.workspace.slug}/guests`);
@@ -276,6 +280,8 @@ export async function createWorkspaceProject(workspaceSlug: string, formData: Fo
     // [DI SINI NANTI KITA MASUKKAN LOGIKA PEMOTONGAN TOKEN/KREDIT PARTNER]
 
     // 3. Penciptaan Proyek (Otonomi Penuh)
+    const { getDefaultEventMetadata, getDefaultThemeConfig } = await import("@/lib/template-presets");
+
     const newProject = await prisma.project.create({
       data: {
         title,
@@ -283,6 +289,8 @@ export async function createWorkspaceProject(workspaceSlug: string, formData: Fo
         eventType,
         workspaceId: workspace.id,
         packageTier: "ESSENTIAL", // Default awal
+        eventMetadata: getDefaultEventMetadata(eventType),
+        themeConfig: getDefaultThemeConfig(eventType),
       }
     });
 
@@ -292,5 +300,235 @@ export async function createWorkspaceProject(workspaceSlug: string, formData: Fo
   } catch (error) {
     console.error("Gagal membuat proyek:", error);
     return { error: "Terjadi kesalahan internal server." };
+  }
+}
+
+export async function addBulkGuests(projectId: string, payload: { text: string }) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const projMeta = await getAuthorizedProjectMeta(projectId, session.user.id, session.user.systemRole);
+  if (!projMeta) return { error: "Security Breach: Akses ditolak." };
+
+  if (!payload.text || payload.text.trim() === "") return { error: "Input teks kosong." };
+
+  const lines = payload.text.split("\n").map(line => line.trim()).filter(line => line.length > 0);
+  if (lines.length === 0) return { error: "Tidak ada nama valid." };
+
+  const uniqueNames = Array.from(new Set(lines));
+
+  const existingGuests = await prisma.guest.findMany({
+    where: { projectId },
+    select: { name: true }
+  });
+  const existingNames = new Set(existingGuests.map(g => g.name.toLowerCase()));
+
+  const newGuestsData = [];
+  
+  for (const name of uniqueNames) {
+    if (existingNames.has(name.toLowerCase())) continue;
+    
+    newGuestsData.push({
+      projectId,
+      name: name,
+      category: "Regular",
+      guestCode: generateGuestCode() + Math.random().toString(36).substring(2, 4).toUpperCase(), // Tambahkan 2 char ekstra utk minimalkan collison massal
+      totalPaxAllocated: 2,
+      rsvpStatus: "PENDING" as any,
+    });
+  }
+
+  if (newGuestsData.length === 0) {
+    return { error: "Semua nama sudah ada di database atau tidak valid." };
+  }
+
+  try {
+    await prisma.guest.createMany({
+      data: newGuestsData,
+      skipDuplicates: true,
+    });
+
+    revalidatePath(`/workspace/${projMeta.workspace.slug}/guests`); 
+    return { success: true, count: newGuestsData.length };
+  } catch (error) {
+    return { error: "Gagal menyimpan data tamu massal." };
+  }
+}
+
+// ============================================================================
+// CRM & CLIENT PORTAL ACTIONS
+// ============================================================================
+
+export async function updateProjectCrm(projectId: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const projMeta = await getAuthorizedProjectMeta(projectId, session.user.id, session.user.systemRole);
+  if (!projMeta) return { error: "Security Breach: Akses ditolak." };
+
+  const clientName = formData.get("clientName") as string;
+  const clientPhone = formData.get("clientPhone") as string;
+  const clientEmail = formData.get("clientEmail") as string;
+  const clientPin = formData.get("clientPin") as string;
+
+  try {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        clientName: clientName || null,
+        clientPhone: clientPhone || null,
+        clientEmail: clientEmail || null,
+        clientPin: clientPin || null,
+      }
+    });
+
+    revalidatePath(`/workspace/${projMeta.workspace.slug}/project/${projMeta.slug}/settings`);
+    return { success: true };
+  } catch (error) {
+    return { error: "Gagal menyimpan konfigurasi CRM." };
+  }
+}
+
+export async function deleteProject(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const projMeta = await getAuthorizedProjectMeta(projectId, session.user.id, session.user.systemRole);
+  if (!projMeta) return { error: "Security Breach: Akses ditolak atau Anda salah Workspace." };
+
+  try {
+    await prisma.project.delete({
+      where: { id: projectId }
+    });
+
+    revalidatePath(`/workspace/${projMeta.workspace.slug}`);
+    return { success: true, workspaceSlug: projMeta.workspace.slug };
+  } catch (error) {
+    console.error("Gagal menghapus proyek:", error);
+    return { error: "Gagal menghapus proyek karena masih ada data yang terhubung." };
+  }
+}
+
+// ============================================================================
+// WALLET & BILLING ACTIONS
+// ============================================================================
+
+export async function payForProject(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const projMeta = await getAuthorizedProjectMeta(projectId, session.user.id, session.user.systemRole);
+  if (!projMeta) return { error: "Security Breach: Akses ditolak." };
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const project = await tx.project.findUnique({
+        where: { id: projectId },
+        include: { workspace: true }
+      });
+
+      if (!project || project.paymentStatus === "PAID") {
+        return { error: "Proyek tidak ditemukan atau sudah lunas." };
+      }
+
+      if (project.workspace.walletBalance < project.agencyCost) {
+        return { error: "Saldo Dompet tidak mencukupi untuk melakukan pembayaran." };
+      }
+
+      // 1. Potong Saldo
+      await tx.workspace.update({
+        where: { id: project.workspaceId },
+        data: { walletBalance: { decrement: project.agencyCost } }
+      });
+
+      // 2. Catat Transaksi Wallet
+      await tx.walletTransaction.create({
+        data: {
+          workspaceId: project.workspaceId,
+          projectId: project.id,
+          amount: -project.agencyCost,
+          type: "PAYMENT",
+          description: `Pembayaran penuh untuk proyek ${project.title}`,
+        }
+      });
+
+      // 3. Ubah Status Proyek
+      await tx.project.update({
+        where: { id: projectId },
+        data: { paymentStatus: "PAID", publishedAt: new Date() }
+      });
+
+      return { success: true };
+    });
+  } catch (error) {
+    console.error("Payment failed", error);
+    return { error: "Gagal memproses pembayaran." };
+  }
+}
+
+export async function cancelProject(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const projMeta = await getAuthorizedProjectMeta(projectId, session.user.id, session.user.systemRole);
+  if (!projMeta) return { error: "Security Breach: Akses ditolak." };
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const project = await tx.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project || project.paymentStatus !== "PAID") {
+        return { error: "Hanya proyek yang sudah lunas yang bisa dibatalkan." };
+      }
+
+      // 1. Kembalikan Saldo (Refund)
+      await tx.workspace.update({
+        where: { id: project.workspaceId },
+        data: { walletBalance: { increment: project.agencyCost } }
+      });
+
+      // 2. Catat Transaksi Wallet
+      await tx.walletTransaction.create({
+        data: {
+          workspaceId: project.workspaceId,
+          projectId: project.id,
+          amount: project.agencyCost,
+          type: "REFUND",
+          description: `Refund pembatalan proyek ${project.title}`,
+        }
+      });
+
+      // 3. Ubah Status Proyek
+      await tx.project.update({
+        where: { id: projectId },
+        data: { paymentStatus: "CANCELLED" }
+      });
+
+      return { success: true };
+    });
+  } catch (error) {
+    console.error("Cancel failed", error);
+    return { error: "Gagal membatalkan proyek." };
+  }
+}
+
+export async function updateProjectInvoiceAmount(projectId: string, amount: number) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const projMeta = await getAuthorizedProjectMeta(projectId, session.user.id, session.user.systemRole);
+  if (!projMeta) return { error: "Akses ditolak." };
+
+  try {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { clientInvoiceAmount: amount }
+    });
+    revalidatePath(`/workspace/${projMeta.workspace.slug}/project/${projMeta.slug}/settings`);
+    return { success: true };
+  } catch (error) {
+    return { error: "Gagal menyimpan data laba rugi." };
   }
 }

@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'images.unsplash.com', // Placeholder foto
+      },
+      {
+        protocol: 'https',
         hostname: 'templates.evory.id', // GANTI/HAPUS jika Anda menggunakan domain yang berbeda
       },
       {
