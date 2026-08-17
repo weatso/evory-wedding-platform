@@ -46,7 +46,9 @@ export default function ProjectFinancialForm({ project }: { project: any }) {
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
                   Harga Jual Aktual (Ke Klien) 
-                  <HelpCircle className="w-3 h-3 text-slate-400" title="Nominal yang dibayar oleh klien kepada agensi Anda." />
+                  <span title="Nominal yang dibayar oleh klien kepada agensi Anda.">
+                    <HelpCircle className="w-3 h-3 text-slate-400" />
+                  </span>
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>

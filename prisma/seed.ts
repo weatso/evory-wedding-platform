@@ -30,7 +30,6 @@ async function main() {
     create: {
       name: "Evory Internal",
       slug: "evory",
-      tier: "CUSTOM",
       members: {
         create: {
           userId: superadmin.id,
@@ -58,9 +57,8 @@ async function main() {
     where: { slug: "radeva-wo" },
     update: {},
     create: {
-      name: "Radeva Wedding Organizer",
-      slug: "radeva-wo",
-      tier: "PRESTIGE",
+      name: "Radeva Creative",
+      slug: "radeva",
       members: {
         create: {
           userId: partnerUser.id,

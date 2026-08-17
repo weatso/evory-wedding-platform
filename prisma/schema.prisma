@@ -200,13 +200,8 @@ model Template {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   assetsConfig   Json?
-  baseModel      String?
-  colorBg        String?
-  colorPrimary   String?
-  colorSecondary String?
-  fontBody       String?
-  fontHeading    String?
-  renderMode     String           @default("DYNAMIC")
+  engineType     String           @default("TYPOGRAPHY")
+  themeConfig    Json
   projects       Project[]
   category       TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   workspace      Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

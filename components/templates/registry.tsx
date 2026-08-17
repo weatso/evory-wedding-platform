@@ -23,15 +23,12 @@ export interface WeddingTemplateProps {
 // WAJIB statis (string literal) agar Next.js bisa melakukan Code Splitting.
 // File Javascript hanya akan diunduh peramban jika template ini benar-benar dipanggil.
 export const TEMPLATE_REGISTRY: Record<string, ComponentType<WeddingTemplateProps>> = {
-  "javanese-series": dynamic(() => import("./javanese/jvn-01"), { ssr: true }),
-  "jvn-royal-01": dynamic(() => import("./javanese/jvn-01"), { ssr: true }),
   // "sultan-andara": dynamic(() => import("./custom/sultan-01"), { ssr: true }),
-  // "mdn-clean-01": dynamic(() => import("./minimalist/mdn-01"), { ssr: true }),
 };
 
 // --- 3. FUNGSI PEMANGGIL ---
 export const getTemplate = (templateId: string | null | undefined): ComponentType<WeddingTemplateProps> => {
-  const Component = TEMPLATE_REGISTRY[templateId || "javanese-series"];
+  const Component = templateId ? TEMPLATE_REGISTRY[templateId] : undefined;
   
   if (!Component) {
     return () => (

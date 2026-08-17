@@ -84,6 +84,28 @@ export async function createTemplate(formData: FormData) {
         isActive: true,
         tier: (tier as PackageTier) || PackageTier.ESSENTIAL,
         isFeatured: isFeatured === "true",
+        engineType: "TYPOGRAPHY",
+        themeConfig: {
+          typography: {
+            fontHeading: 'Playfair Display',
+            fontBody: 'Inter',
+            colorPrimary: '#07303F',
+            colorBg: '#F9F8F4'
+          },
+          modules: {
+            "00_SPLASH": { enabled: true },
+            "01_COVER": { enabled: true },
+            "02_OPENING": { enabled: true },
+            "03_COUPLE": { enabled: true },
+            "04_EVENT": { enabled: true },
+            "05_LOVESTORY": { enabled: false }, 
+            "06_LIVESTREAM": { enabled: false },
+            "07_RSVP": { enabled: true },
+            "08_GIFT": { enabled: true },
+            "09_GALLERY": { enabled: true },
+            "10_FOOTER": { enabled: true }
+          }
+        },
       },
     });
 

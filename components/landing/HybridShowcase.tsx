@@ -163,6 +163,17 @@ export default function HybridShowcase({ categories }: { categories: any[] }) {
         </button>
       </div>
 
+      {/* View Full Collection Button */}
+      <div className="mt-16 md:mt-20 z-40">
+        <Link 
+          href="/collection" 
+          className="inline-flex items-center justify-center gap-3 bg-transparent border border-[#07303F]/20 text-[#07303F] px-10 py-4 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#07303F] hover:text-[#E5C185] transition-all duration-300 shadow-sm"
+        >
+          View Full Collection
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+
     </section>
   );
 }

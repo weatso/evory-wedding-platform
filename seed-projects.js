@@ -78,9 +78,9 @@ async function main() {
   });
 
   console.log('Seeding projects completed! Anda bisa melihat undangan di:');
-  console.log('- http://localhost:3000/invite-typo');
-  console.log('- http://localhost:3000/invite-serene');
-  console.log('- http://localhost:3000/invite-royal');
+  console.log('- http://localhost:3000/invitation/invite-typo');
+  console.log('- http://localhost:3000/invitation/invite-serene');
+  console.log('- http://localhost:3000/invitation/invite-royal');
 }
 
 main()

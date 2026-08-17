@@ -55,20 +55,15 @@ export default async function CollectionPage({
     <div className="min-h-screen bg-[#F9F8F4] text-[#07303F] selection:bg-[#E5C185] selection:text-[#07303F]">
       
       {/* HEADER NAVIGASI KHUSUS GUDANG */}
-      <header className="h-20 border-b border-slate-200 bg-[#F9F8F4]/80 backdrop-blur-md px-6 lg:px-12 flex items-center justify-between sticky top-0 z-50">
-        <Link href="/" className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-[#07303F] transition-colors group">
+      <header className="h-20 border-b border-slate-200 bg-[#F9F8F4]/80 backdrop-blur-md px-6 lg:px-12 flex items-center justify-between sticky top-0 z-50 relative">
+        <Link href="/" className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-[#07303F] transition-colors group z-10">
           <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> 
           <span className="hidden sm:inline">Back to Vault</span>
         </Link>
 
-        <div className="font-serif italic text-xl md:text-2xl font-bold text-[#07303F]">
+        <div className="font-serif italic text-xl md:text-2xl font-bold text-[#07303F] absolute left-1/2 -translate-x-1/2 w-max">
           The Collection
         </div>
-
-        <Link href="/login" className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-[#E5C185] transition-colors group">
-          <span className="hidden sm:inline">Dashboard</span> 
-          <LayoutDashboard size={14} className="group-hover:scale-110 transition-transform" />
-        </Link>
       </header>
 
       {/* KONTEN UTAMA */}
